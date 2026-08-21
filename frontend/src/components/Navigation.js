@@ -17,6 +17,7 @@ import {
   Mood as MoodIcon,
   Book as BookIcon,
   Chat as ChatIcon,
+  Psychology as PsychologyIcon,
   LocalLibrary as ResourcesIcon,
   Person as PersonIcon,
   Favorite as HeartIcon,
@@ -29,6 +30,7 @@ const menuItems = [
   { text: 'Mood Tracker', icon: <MoodIcon />, path: '/mood' },
   { text: 'Journal', icon: <BookIcon />, path: '/journal' },
   { text: 'AI Chat', icon: <ChatIcon />, path: '/chat' },
+  { text: 'Multimodal Analysis', icon: <PsychologyIcon />, path: '/multimodal' },
   { text: 'Resources', icon: <ResourcesIcon />, path: '/resources' },
   { text: 'Profile', icon: <PersonIcon />, path: '/profile' },
 ];

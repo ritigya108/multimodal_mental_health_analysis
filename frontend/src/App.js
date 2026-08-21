@@ -11,6 +11,7 @@ import Journal from './pages/Journal';
 import ChatBot from './pages/ChatBot';
 import Resources from './pages/Resources';
 import Profile from './pages/Profile';
+import MultimodalAnalysis from './pages/MultimodalAnalysis';
 
 // Components
 import Navigation from './components/Navigation';
@@ -99,6 +100,7 @@ function App() {
               <Route path="/mood" element={<MoodTracker />} />
               <Route path="/journal" element={<Journal />} />
               <Route path="/chat" element={<ChatBot />} />
+              <Route path="/multimodal" element={<MultimodalAnalysis />} />
               <Route path="/resources" element={<Resources />} />
               <Route path="/profile" element={<Profile />} />
             </Routes>
