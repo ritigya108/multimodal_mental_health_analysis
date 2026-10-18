@@ -1,321 +1,161 @@
-# 🚀 HOW TO RUN - Step by Step Guide
+# 🚀 HOW TO RUN — MindCare AI Multimodal Mental Health Analysis
 
-## ⚡ Quick Start (Copy-Paste These Commands)
-
-### Step 1: Open Terminal and Navigate to Project
-```bash
-cd /Users/vishwachi/Desktop/mental-health-ai
-```
+> **You do NOT need the DAIC-WOZ dataset to run the project right now.**
+> Everything works with the included synthetic data.
+> See [`DATASET_SWAP_GUIDE.md`](DATASET_SWAP_GUIDE.md) for what changes when you get it.
 
 ---
 
-## 🔧 BACKEND SETUP (Do This First)
+## Quick Start (5 minutes)
 
-### Step 2: Go to Backend Folder
-```bash
-cd backend
-```
+### 1. Install Python dependencies
 
-### Step 3: Create Virtual Environment (First Time Only)
 ```bash
-python3 -m venv venv
-```
-**Wait**: This takes 1-2 minutes
+cd multimodal_mental_health_analysis/backend
+python -m venv venv
 
-### Step 4: Activate Virtual Environment
-```bash
+# Windows
+venv\Scripts\activate
+
+# macOS / Linux
 source venv/bin/activate
-```
-**You should see** `(venv)` at the start of your terminal line
 
-### Step 5: Install Python Packages (First Time Only)
-```bash
-pip install --upgrade pip
 pip install -r requirements.txt
+pip install -r requirements_multimodal.txt
 ```
-**Wait**: This takes 3-5 minutes
 
-### Step 6: Start Backend Server
+### 2. Start the backend API
+
 ```bash
+# (venv must be active)
+cd multimodal_mental_health_analysis/backend
 python main.py
 ```
 
-**✅ SUCCESS**: You should see:
-```
-INFO:     Uvicorn running on http://0.0.0.0:8000
-INFO:     Application startup complete.
-```
+Backend runs at **http://localhost:8000**
+API docs at **http://localhost:8000/docs** (FastAPI Swagger UI)
 
-**Keep this terminal open!** Backend is now running.
+### 3a. Run the Streamlit app (recommended)
 
----
-
-## 💻 FRONTEND SETUP (Open New Terminal)
-
-### Step 7: Open NEW Terminal Window
-Press `Cmd + T` (Mac) or open new terminal window
-
-### Step 8: Go to Frontend Folder
 ```bash
-cd /Users/vishwachi/Desktop/mental-health-ai/frontend
+cd multimodal_mental_health_analysis/streamlit-app
+pip install streamlit plotly requests
+streamlit run Home.py
 ```
 
-### Step 9: Install Node Packages (First Time Only)
+Opens at **http://localhost:8501**
+
+### 3b. Run the React frontend (alternative)
+
 ```bash
+cd multimodal_mental_health_analysis/frontend
 npm install
-```
-**Wait**: This takes 2-3 minutes
-
-### Step 10: Start Frontend Server
-```bash
 npm start
 ```
 
-**✅ SUCCESS**: Browser will automatically open to `http://localhost:3000`
-
-If it doesn't open automatically, manually open browser and go to:
-```
-http://localhost:3000
-```
+Opens at **http://localhost:3000**
 
 ---
 
-## 🎉 YOU'RE DONE!
+## Running the ML Pipeline (no real dataset needed)
 
-You should now see:
-- ✅ Backend running at: http://localhost:8000
-- ✅ Frontend running at: http://localhost:3000
-- ✅ Web application open in browser
-
----
-
-## 📱 Using the Application
-
-1. **Navigate** to "Multimodal Analysis" in the sidebar
-2. **Upload** audio, video, or enter text
-3. **Click** "Analyze Mental Health Indicators"
-4. **View** results with charts and recommendations
-
----
-
-## 🛑 How to Stop
-
-### Stop Frontend:
-In the frontend terminal, press: `Ctrl + C`
-
-### Stop Backend:
-In the backend terminal, press: `Ctrl + C`
-
-### Deactivate Virtual Environment:
-```bash
-deactivate
-```
-
----
-
-## 🔄 Running Again (Next Time)
-
-### Terminal 1 (Backend):
-```bash
-cd /Users/vishwachi/Desktop/mental-health-ai/backend
-source venv/bin/activate
-python main.py
-```
-
-### Terminal 2 (Frontend):
-```bash
-cd /Users/vishwachi/Desktop/mental-health-ai/frontend
-npm start
-```
-
-**That's it!** No need to install packages again.
-
----
-
-## ❌ Troubleshooting
-
-### Problem 1: "python3: command not found"
-**Solution**: Install Python 3
-```bash
-# Mac
-brew install python@3.10
-
-# Ubuntu
-sudo apt-get install python3.10
-```
-
-### Problem 2: "npm: command not found"
-**Solution**: Install Node.js
-```bash
-# Mac
-brew install node
-
-# Ubuntu
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt-get install -y nodejs
-```
-
-### Problem 3: "Port 8000 already in use"
-**Solution**: Kill the process
-```bash
-# Find process
-lsof -ti:8000
-
-# Kill it
-kill -9 $(lsof -ti:8000)
-
-# Or use different port
-# In backend/main.py, change port to 8080
-```
-
-### Problem 4: "Port 3000 already in use"
-**Solution**: 
-```bash
-# Kill process
-kill -9 $(lsof -ti:3000)
-
-# Or when prompted, press 'Y' to use different port
-```
-
-### Problem 5: "Module not found" errors
-**Solution**: Reinstall packages
-```bash
-# Backend
-cd backend
-source venv/bin/activate
-pip install -r requirements.txt
-
-# Frontend
-cd frontend
-rm -rf node_modules
-npm install
-```
-
-### Problem 6: Virtual environment won't activate
-**Solution**: 
-```bash
-# Delete and recreate
-rm -rf venv
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
-
----
-
-## 📊 Verify Everything is Working
-
-### Check Backend:
-Open browser to: http://localhost:8000/health
-
-You should see:
-```json
-{
-  "status": "healthy",
-  "timestamp": "2024-..."
-}
-```
-
-### Check Frontend:
-Open browser to: http://localhost:3000
-
-You should see the MindCare application with navigation menu.
-
----
-
-## 🎯 Complete Command Summary
+The full training + evaluation pipeline works right now using **synthetic DAIC-WOZ data**
+(already generated in `backend/data/synthetic_daic/`).
 
 ```bash
-# ============================================
-# FIRST TIME SETUP (Do Once)
-# ============================================
+cd multimodal_mental_health_analysis
+python run_pipeline.py --mode synthetic
+```
 
-# Backend Setup
-cd /Users/vishwachi/Desktop/mental-health-ai/backend
-python3 -m venv venv
-source venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
+This will:
+1. Generate synthetic participant data (if not already done)
+2. Preprocess features (audio MFCCs, text tokens, facial AU sequences)
+3. Train the multimodal model (AudioCNN + BERT + BiLSTM + Attention Fusion)
+4. Evaluate and print metrics to the console
+5. Save checkpoints to `backend/checkpoints/synthetic/best.pt`
 
-# Frontend Setup (New Terminal)
-cd /Users/vishwachi/Desktop/mental-health-ai/frontend
-npm install
+For a faster smoke-test (fewer participants):
 
-# ============================================
-# RUNNING THE APPLICATION (Every Time)
-# ============================================
-
-# Terminal 1: Backend
-cd /Users/vishwachi/Desktop/mental-health-ai/backend
-source venv/bin/activate
-python main.py
-
-# Terminal 2: Frontend
-cd /Users/vishwachi/Desktop/mental-health-ai/frontend
-npm start
-
-# ============================================
-# ACCESS
-# ============================================
-# Backend: http://localhost:8000
-# Frontend: http://localhost:3000
+```bash
+python run_pipeline.py --mode synthetic --quick --epochs 5
 ```
 
 ---
 
-## 🎓 For Presentation/Demo
+## Project Pages
 
-### Before Demo:
-1. Start backend (Terminal 1)
-2. Start frontend (Terminal 2)
-3. Open browser to http://localhost:3000
-4. Navigate to "Multimodal Analysis"
-5. Keep it ready
-
-### During Demo:
-1. Show the interface
-2. Upload sample audio/video/text
-3. Click "Analyze"
-4. Show results with charts
-5. Explain the multimodal analysis
+| Page | URL (Streamlit) | Description |
+|------|----------------|-------------|
+| Dashboard | http://localhost:8501 | Overview & mood trend |
+| Mood Tracker | http://localhost:8501/Mood_Tracker | Log daily mood 1–10 |
+| Journal | http://localhost:8501/Journal | Write + sentiment-analyse entries |
+| AI Chat | http://localhost:8501/AI_Chat | Mental health chatbot |
+| Resources | http://localhost:8501/Resources | Helplines, articles, exercises |
+| Profile | http://localhost:8501/Profile | User settings |
+| **Multimodal Analysis** | http://localhost:8501/Multimodal_Analysis | 🆕 Full AI analysis (text/audio/video) |
 
 ---
 
-## 💡 Pro Tips
+## API Endpoints
 
-1. **Always start backend first**, then frontend
-2. **Keep both terminals open** while using the app
-3. **Use Cmd+T** to open new terminal tabs (Mac)
-4. **Check http://localhost:8000/docs** for API documentation
-5. **The app has mock data** - works without real dataset
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET`  | `/health` | Health check |
+| `POST` | `/api/mood/log` | Log a mood entry |
+| `GET`  | `/api/mood/history/{user_id}` | Mood history |
+| `POST` | `/api/journal/entry` | Create journal entry |
+| `POST` | `/api/analyze/sentiment` | Text sentiment analysis |
+| `GET`  | `/api/analyze/risk/{user_id}` | Risk assessment |
+| `POST` | `/api/chat` | Chatbot |
+| **`POST`** | **`/api/multimodal/analyze`** | 🆕 Full multimodal analysis (form upload) |
+| **`POST`** | **`/api/multimodal/analyze/text`** | 🆕 Text-only JSON analysis |
 
----
+### Test the multimodal endpoint directly
 
-## 📞 Still Having Issues?
+```bash
+# Text-only (JSON body)
+curl -X POST http://localhost:8000/api/multimodal/analyze/text \
+     -H "Content-Type: application/json" \
+     -d '{"text": "I have been feeling very sad and hopeless lately."}'
 
-1. Check if Python 3.8+ is installed: `python3 --version`
-2. Check if Node.js 16+ is installed: `node --version`
-3. Check if ports 8000 and 3000 are free
-4. Try restarting your computer
-5. Delete `venv` and `node_modules`, reinstall everything
-
----
-
-## ✅ Success Checklist
-
-- [ ] Python 3.8+ installed
-- [ ] Node.js 16+ installed
-- [ ] Backend virtual environment created
-- [ ] Backend packages installed
-- [ ] Frontend packages installed
-- [ ] Backend running on port 8000
-- [ ] Frontend running on port 3000
-- [ ] Browser opens to http://localhost:3000
-- [ ] Can navigate to "Multimodal Analysis"
-- [ ] Can see the interface
+# With audio file
+curl -X POST http://localhost:8000/api/multimodal/analyze \
+     -F "text=I feel empty and exhausted all the time" \
+     -F "audio_file=@path/to/audio.wav"
+```
 
 ---
 
-**That's it! You're ready to run your ML project! 🚀**
+## Current Model Status
 
-If you see the web interface, everything is working correctly!
+| Mode | Checkpoint location | Status |
+|------|-------------------|--------|
+| Synthetic | `backend/checkpoints/synthetic/best.pt` | ✅ Trained (included) |
+| DAIC-WOZ | `backend/checkpoints/daic/best.pt` | ⏳ Awaiting dataset access |
+| EATD-Corpus | `backend/checkpoints/eatd/best.pt` | ⏳ Optional free alternative |
+
+The API automatically uses the best available checkpoint. If no checkpoint loads
+(e.g. incompatible architecture after an upgrade), it falls back to the
+**linguistic heuristic analyser** which requires zero extra dependencies.
+
+---
+
+## When You Get the DAIC-WOZ Dataset
+
+See [`DATASET_SWAP_GUIDE.md`](DATASET_SWAP_GUIDE.md) — it's only 2 lines of config to change.
+
+---
+
+## Troubleshooting
+
+| Error | Fix |
+|-------|-----|
+| `ModuleNotFoundError: fastapi` | `pip install -r backend/requirements.txt` |
+| `ModuleNotFoundError: streamlit` | `pip install streamlit plotly requests` |
+| Backend port 8000 already in use | `python main.py` auto-reloads; kill the old process first |
+| CORS error in browser | Backend must be running on port 8000 (it adds the React/Streamlit origins automatically) |
+| `transformers` slow first run | BERT tokenizer downloads on first use (~400 MB). It is cached after that. |
+
+---
+
+*Made with Bob*

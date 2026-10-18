@@ -1,0 +1,4 @@
+speaker,value,text_cleaned,emotion
+Participant,今天天气很好。,今天天气很好。,positive
+Participant,忘记了，没有跟别人争吵过。,忘记了，没有跟别人争吵过。,negative
+Participant,不喜欢，因为小孩子很麻烦。,不喜欢，因为小孩子很麻烦。,neutral

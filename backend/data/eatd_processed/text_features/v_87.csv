@@ -1,0 +1,4 @@
+speaker,value,text_cleaned,emotion
+Participant,他写代码很厉害。,他写代码很厉害。,positive
+Participant,在玩桌游的时候。然后他太菜了。,在玩桌游的时候。然后他太菜了。,negative
+Participant,游戏服务器开发，因为我觉得游戏行业比较热门。,游戏服务器开发，因为我觉得游戏行业比较热门。,neutral

@@ -54,46 +54,42 @@ function ChatBot() {
   const handleSendMessage = async (messageText = inputMessage) => {
     if (!messageText.trim()) return;
 
-    // Add user message
-    const userMessage = {
-      id: messages.length + 1,
-      text: messageText,
-      sender: 'user',
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, userMessage]);
+    // Add user message — use functional updater so ID is always correct
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        text: messageText,
+        sender: 'user',
+        timestamp: new Date(),
+      },
+    ]);
     setInputMessage('');
     setIsTyping(true);
 
+    let botText = getBotResponse(messageText); // local fallback ready
+
     try {
-      // Call API
       const response = await apiService.sendChatMessage(messageText, userId);
-      
-      // Simulate typing delay
-      setTimeout(() => {
-        const botMessage = {
-          id: messages.length + 2,
-          text: response.bot_response || getBotResponse(messageText),
-          sender: 'bot',
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, botMessage]);
-        setIsTyping(false);
-      }, 1000);
+      if (response?.bot_response) botText = response.bot_response;
     } catch (error) {
-      console.error('Error sending message:', error);
-      // Fallback response
-      setTimeout(() => {
-        const botMessage = {
-          id: messages.length + 2,
-          text: getBotResponse(messageText),
+      // backend offline — botText stays as local getBotResponse result
+      console.warn('Chat API unreachable, using local response:', error.message);
+    }
+
+    // Small delay to simulate typing, then append bot reply
+    setTimeout(() => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          text: botText,
           sender: 'bot',
           timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, botMessage]);
-        setIsTyping(false);
-      }, 1000);
-    }
+        },
+      ]);
+      setIsTyping(false);
+    }, 900);
   };
 
   const getBotResponse = (userMessage) => {

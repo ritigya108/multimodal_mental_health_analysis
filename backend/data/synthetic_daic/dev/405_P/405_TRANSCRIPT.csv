@@ -1,0 +1,25 @@
+start_time	stop_time	speaker	value
+0.0	2.43	Ellie	How are you doing today?
+2.75	10.31	Participant	I'm doing pretty well, thanks for asking. It's complicated.
+11.14	13.83	Ellie	Can you tell me a little about yourself?
+14.45	22.23	Participant	Things have been going okay. I've been busy but managing.
+22.86	25.62	Ellie	How have you been sleeping lately?
+26.05	33.61	Participant	My sleep has been pretty good lately, usually around seven or eight hours.
+34.85	37.82	Ellie	Do you find yourself enjoying things you used to enjoy?
+38.48	47.86	Participant	Yes, I still enjoy most of my hobbies. I went hiking last weekend. I'm not sure.
+48.93	52.06	Ellie	How is your energy level throughout the day?
+52.45	61.44	Participant	My energy is generally fine. I feel tired in the evenings but that's normal.
+62.77	65.54	Ellie	Have you been feeling down or hopeless recently?
+65.89	71.66	Participant	Not really. I feel optimistic about the future.
+72.3	74.78	Ellie	How is your appetite?
+75.21	83.0	Participant	My appetite is normal. I eat three meals a day. I guess so.
+83.77	86.26	Ellie	Do you have trouble concentrating?
+86.85	93.68	Participant	No major issues with concentration. I can focus well at work.
+94.54	96.89	Ellie	Have you been feeling more tired than usual?
+97.52	103.54	Participant	I feel my normal level of tired, nothing unusual.
+104.73	108.11	Ellie	What do you do to relax or unwind?
+108.86	116.54	Participant	I like reading and going for walks. That helps me unwind.
+117.68	121.09	Ellie	Do you have a support system — friends or family you can talk to?
+121.57	129.43	Participant	Yes, I have close friends and family I can always turn to. Yeah.
+130.38	133.87	Ellie	Have you experienced any major stressors recently?
+134.35	141.28	Participant	Not really, things have been relatively stable.

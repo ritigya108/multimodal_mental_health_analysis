@@ -1,0 +1,103 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MindCare AI — Docker Compose
+#
+# Services:
+#   backend  — FastAPI (port 8000, internal only)
+#   frontend — React + Nginx (port 3000 → 80)
+#   streamlit— Streamlit ML demo (port 8501)
+#
+# Usage:
+#   docker compose up --build          # first run
+#   docker compose up -d               # background
+#   docker compose down -v             # stop + remove volumes
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── FastAPI Backend ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mindcare_backend
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ENVIRONMENT=production
+      # Copy .env.example → .env and fill in your secrets
+      - DATABASE_URL=${DATABASE_URL:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - SECRET_KEY=${SECRET_KEY:-change_me_in_production}
+    env_file:
+      - ./backend/.env
+    volumes:
+      # Persist model checkpoints so they survive container restarts
+      - checkpoints:/app/checkpoints
+      # Persist SQLite database (if used instead of Postgres)
+      - backend_data:/app/data
+    networks:
+      - mindcare_net
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── React Frontend (Nginx) ───────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mindcare_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - mindcare_net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost/nginx-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Streamlit ML Demo ────────────────────────────────────────────────────────
+  streamlit:
+    build:
+      context: ./streamlit-app
+      dockerfile: Dockerfile
+    container_name: mindcare_streamlit
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - mindcare_net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# ─────────────────────────────────────────────────────────────────────────────
+networks:
+  mindcare_net:
+    driver: bridge
+
+volumes:
+  checkpoints:
+    name: mindcare_checkpoints
+  backend_data:
+    name: mindcare_backend_data

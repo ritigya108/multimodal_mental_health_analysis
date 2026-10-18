@@ -1,0 +1,389 @@
+"""
+DAIC-WOZ Dataset Loader
+-----------------------
+Loads and serves multimodal features (audio, text, facial) aligned to PHQ-8 labels.
+
+Expected processed directory layout (output of clean_daic_dataset.py):
+  <processed_dir>/
+    audio_features/    <participant_id>.npy   — dict-style ndarray OR raw mel array
+    text_features/     <participant_id>.csv   — cleaned transcripts from process_participant()
+    facial_features/   <participant_id>.csv   — cleaned OpenFace AU sequences
+
+Label CSVs (from the raw DAIC-WOZ root):
+  train_split_Depression_AVEC2017.csv
+  dev_split_Depression_AVEC2017.csv
+  test_split_Depression_AVEC2017.csv
+
+  Columns: Participant_ID, PHQ8_Score, PHQ8_Binary, Gender
+"""
+
+import os
+import numpy as np
+import pandas as pd
+import torch
+from torch.utils.data import Dataset, DataLoader
+from pathlib import Path
+from typing import Optional, Tuple
+import librosa
+from transformers import BertTokenizer
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Constants
+# ──────────────────────────────────────────────────────────────────────────────
+
+DEPRESSION_THRESHOLD = 10          # PHQ-8 score ≥ 10 → depressed
+MAX_TEXT_LEN        = 512          # BERT max token length
+MAX_AU_FRAMES       = 300          # temporal AU frames kept per participant
+N_MELS              = 128          # mel-spectrogram bins
+AUDIO_DURATION      = 60           # seconds of audio used per participant
+SAMPLE_RATE         = 16000
+
+# Action Unit intensity columns produced by OpenFace (17 AUs)
+AU_COLS = [
+    'AU01_r','AU02_r','AU04_r','AU05_r','AU06_r','AU07_r',
+    'AU09_r','AU10_r','AU12_r','AU14_r','AU15_r','AU17_r',
+    'AU20_r','AU23_r','AU25_r','AU26_r','AU45_r',
+]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Feature helpers
+# ──────────────────────────────────────────────────────────────────────────────
+
+def load_audio_as_melspectrogram(audio_path: str) -> np.ndarray:
+    """Load a .wav file and return a (1, N_MELS, T) mel-spectrogram."""
+    audio, sr = librosa.load(audio_path, sr=SAMPLE_RATE,
+                              duration=AUDIO_DURATION)
+    mel = librosa.feature.melspectrogram(
+        y=audio, sr=sr, n_mels=N_MELS, fmax=8000
+    )
+    mel_db = librosa.power_to_db(mel, ref=np.max)
+    # Normalise to [0, 1]
+    mel_db = (mel_db - mel_db.min()) / (mel_db.max() - mel_db.min() + 1e-8)
+    return mel_db.astype(np.float32)   # shape: (N_MELS, T)
+
+
+def aggregate_transcript(csv_path: str) -> str:
+    """Concatenate all cleaned participant utterances into a single string."""
+    try:
+        df = pd.read_csv(csv_path)
+        # Support both raw (speaker/value) and pre-cleaned (text_cleaned) layouts
+        if 'text_cleaned' in df.columns:
+            texts = df['text_cleaned'].dropna().tolist()
+        elif 'value' in df.columns:
+            df = df[df['speaker'] == 'Participant'] if 'speaker' in df.columns else df
+            texts = df['value'].dropna().tolist()
+        else:
+            texts = []
+        return ' '.join(str(t) for t in texts).strip()
+    except Exception:
+        return ''
+
+
+def load_facial_sequence(csv_path: str) -> np.ndarray:
+    """
+    Load OpenFace AU intensities and return a fixed-length
+    (MAX_AU_FRAMES, len(AU_COLS)) array.
+    """
+    try:
+        df = pd.read_csv(csv_path)
+        # Support both cleaned and raw layouts
+        avail = [c for c in AU_COLS if c in df.columns]
+        if not avail:
+            # Try space-stripped column names
+            df.columns = df.columns.str.strip()
+            avail = [c for c in AU_COLS if c in df.columns]
+        if not avail:
+            return np.zeros((MAX_AU_FRAMES, len(AU_COLS)), dtype=np.float32)
+
+        arr = df[avail].values.astype(np.float32)
+
+        # Pad or truncate to MAX_AU_FRAMES
+        T = arr.shape[0]
+        if T >= MAX_AU_FRAMES:
+            arr = arr[:MAX_AU_FRAMES]
+        else:
+            pad = np.zeros((MAX_AU_FRAMES - T, arr.shape[1]), dtype=np.float32)
+            arr = np.concatenate([arr, pad], axis=0)
+
+        # Fill any remaining AU columns with zeros if some AUs are missing
+        if arr.shape[1] < len(AU_COLS):
+            pad_cols = np.zeros(
+                (MAX_AU_FRAMES, len(AU_COLS) - arr.shape[1]), dtype=np.float32
+            )
+            arr = np.concatenate([arr, pad_cols], axis=1)
+
+        return arr  # (MAX_AU_FRAMES, len(AU_COLS))
+    except Exception:
+        return np.zeros((MAX_AU_FRAMES, len(AU_COLS)), dtype=np.float32)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Dataset class
+# ──────────────────────────────────────────────────────────────────────────────
+
+class DAICWOZDataset(Dataset):
+    """
+    PyTorch Dataset for the DAIC-WOZ multimodal depression corpus.
+
+    Parameters
+    ----------
+    labels_csv      : path to *_split_Depression_AVEC2017.csv
+    processed_dir   : root folder containing audio_features/, text_features/,
+                      facial_features/  (output of clean_daic_dataset.py)
+    raw_audio_dir   : (optional) if set, load mel-spectrograms directly from
+                      raw .wav files instead of pre-saved .npy files
+    task            : 'classification' (binary PHQ8_Binary) or
+                      'regression'    (continuous PHQ8_Score)
+    use_bert        : tokenise text with BERT tokenizer
+    augment         : light data-augmentation for training
+    """
+
+    def __init__(
+        self,
+        labels_csv: str,
+        processed_dir: str,
+        raw_audio_dir: Optional[str] = None,
+        task: str = 'classification',
+        use_bert: bool = True,
+        augment: bool = False,
+    ):
+        self.processed_dir = Path(processed_dir)
+        self.raw_audio_dir = Path(raw_audio_dir) if raw_audio_dir else None
+        self.task    = task
+        self.augment = augment
+        self.use_bert = use_bert
+
+        # Load label file
+        df = pd.read_csv(labels_csv)
+        # Normalise column names
+        df.columns = df.columns.str.strip()
+        self.labels_df = df.reset_index(drop=True)
+
+        # BERT tokenizer (loaded once, shared across workers)
+        if use_bert:
+            self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        else:
+            self.tokenizer = None
+
+        # Filter to participants that have at least one modality available
+        self._valid_ids = self._filter_valid_participants()
+
+    # ------------------------------------------------------------------
+    def _filter_valid_participants(self):
+        valid = []
+        for _, row in self.labels_df.iterrows():
+            raw = str(row['Participant_ID']).strip()
+            # Support both numeric DAIC-WOZ IDs (300) and EATD-style IDs (t_1, v_5)
+            try:
+                pid = str(int(raw))
+            except ValueError:
+                pid = raw
+            has_audio   = (self.processed_dir / 'audio_features'  / f'{pid}.npy').exists() \
+                          or (self.raw_audio_dir is not None and self._find_wav(pid) is not None)
+            has_text    = (self.processed_dir / 'text_features'   / f'{pid}.csv').exists()
+            has_facial  = (self.processed_dir / 'facial_features' / f'{pid}.csv').exists()
+            if has_audio or has_text or has_facial:
+                valid.append(pid)
+        print(f"[DAICWOZDataset] {len(valid)} / {len(self.labels_df)} participants loaded.")
+        return valid
+
+    def _find_wav(self, pid: str) -> Optional[Path]:
+        """Locate the raw .wav file for a participant across train/dev/test splits."""
+        if self.raw_audio_dir is None:
+            return None
+        for split in ['train', 'dev', 'test']:
+            p = self.raw_audio_dir / split / f'{pid}_P' / f'{pid}_AUDIO.wav'
+            if p.exists():
+                return p
+        return None
+
+    # ------------------------------------------------------------------
+    def __len__(self):
+        return len(self._valid_ids)
+
+    def __getitem__(self, idx: int):
+        pid  = self._valid_ids[idx]
+        row  = self.labels_df[self.labels_df['Participant_ID'].astype(str).str.strip() == pid].iloc[0]
+
+        # ── Labels ──────────────────────────────────────────────────────
+        if self.task == 'regression':
+            label = torch.tensor(float(row['PHQ8_Score']), dtype=torch.float32)
+        else:
+            label = torch.tensor(int(row['PHQ8_Binary']), dtype=torch.long)
+
+        # ── Audio ────────────────────────────────────────────────────────
+        audio_tensor = self._load_audio(pid)
+
+        # ── Text ─────────────────────────────────────────────────────────
+        text_ids, text_mask = self._load_text(pid)
+
+        # ── Facial AUs ───────────────────────────────────────────────────
+        facial_tensor = self._load_facial(pid)
+
+        return {
+            'participant_id' : pid,
+            'audio'          : audio_tensor,          # (1, N_MELS, T)
+            'text_ids'       : text_ids,              # (MAX_TEXT_LEN,)
+            'text_mask'      : text_mask,             # (MAX_TEXT_LEN,)
+            'facial'         : facial_tensor,         # (MAX_AU_FRAMES, N_AU)
+            'label'          : label,
+        }
+
+    # ------------------------------------------------------------------
+    # Modality loaders
+    # ------------------------------------------------------------------
+
+    def _load_audio(self, pid: str) -> torch.Tensor:
+        npy_path = self.processed_dir / 'audio_features' / f'{pid}.npy'
+        if npy_path.exists():
+            data = np.load(npy_path, allow_pickle=True)
+            # Handles both dict-style saves and direct array saves
+            if isinstance(data, np.ndarray) and data.dtype == object:
+                data = data.item()  # unwrap dict
+            if isinstance(data, dict):
+                # Aggregate pre-extracted hand-crafted features — handle both arrays and scalars
+                arrays = []
+                for v in data.values():
+                    v = np.atleast_1d(np.asarray(v, dtype=np.float32))
+                    arrays.append(v.flatten())
+                vals = np.concatenate(arrays)
+                mel = np.tile(vals[:N_MELS], (N_MELS, 1)).astype(np.float32)
+                mel = (mel - mel.min()) / (mel.max() - mel.min() + 1e-8)
+            else:
+                mel = data.astype(np.float32)
+                if mel.ndim == 1:
+                    mel = np.expand_dims(mel, 0).repeat(N_MELS, axis=0)
+        else:
+            wav_path = self._find_wav(pid)
+            if wav_path:
+                mel = load_audio_as_melspectrogram(str(wav_path))
+            else:
+                mel = np.zeros((N_MELS, 128), dtype=np.float32)
+
+        # Ensure fixed width (time axis) = 128 frames
+        T_target = 128
+        if mel.shape[1] >= T_target:
+            mel = mel[:, :T_target]
+        else:
+            mel = np.pad(mel, ((0, 0), (0, T_target - mel.shape[1])))
+
+        if self.augment:
+            mel = self._augment_audio(mel)
+
+        return torch.tensor(mel, dtype=torch.float32).unsqueeze(0)  # (1, N_MELS, T)
+
+    def _load_text(self, pid: str) -> Tuple[torch.Tensor, torch.Tensor]:
+        csv_path = self.processed_dir / 'text_features' / f'{pid}.csv'
+        if csv_path.exists():
+            text = aggregate_transcript(str(csv_path))
+        else:
+            text = ''
+
+        if not text:
+            text = '[PAD]'
+
+        if self.use_bert and self.tokenizer is not None:
+            enc = self.tokenizer(
+                text,
+                max_length=MAX_TEXT_LEN,
+                padding='max_length',
+                truncation=True,
+                return_tensors='pt',
+            )
+            return enc['input_ids'].squeeze(0), enc['attention_mask'].squeeze(0)
+        else:
+            # Simple word-index fallback (for quick testing without BERT)
+            tokens = text.split()[:MAX_TEXT_LEN]
+            ids = torch.zeros(MAX_TEXT_LEN, dtype=torch.long)
+            mask = torch.zeros(MAX_TEXT_LEN, dtype=torch.long)
+            for i, t in enumerate(tokens):
+                ids[i]  = hash(t) % 30000
+                mask[i] = 1
+            return ids, mask
+
+    def _load_facial(self, pid: str) -> torch.Tensor:
+        csv_path = self.processed_dir / 'facial_features' / f'{pid}.csv'
+        if csv_path.exists():
+            arr = load_facial_sequence(str(csv_path))
+        else:
+            arr = np.zeros((MAX_AU_FRAMES, len(AU_COLS)), dtype=np.float32)
+        return torch.tensor(arr, dtype=torch.float32)  # (MAX_AU_FRAMES, N_AU)
+
+    # ------------------------------------------------------------------
+    # Augmentation
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _augment_audio(mel: np.ndarray) -> np.ndarray:
+        """Minimal spec-augment: random frequency and time masking."""
+        mel = mel.copy()
+        # Frequency masking (up to 10 bins)
+        f_start = np.random.randint(0, max(1, N_MELS - 10))
+        f_end   = min(f_start + np.random.randint(1, 11), N_MELS)
+        mel[f_start:f_end, :] = 0.0
+        # Time masking (up to 15 frames)
+        t_start = np.random.randint(0, max(1, mel.shape[1] - 15))
+        t_end   = min(t_start + np.random.randint(1, 16), mel.shape[1])
+        mel[:, t_start:t_end] = 0.0
+        return mel
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# DataLoader factory
+# ──────────────────────────────────────────────────────────────────────────────
+
+def get_dataloaders(
+    daic_root: str,
+    processed_dir: str,
+    raw_audio_dir: Optional[str] = None,
+    task: str = 'classification',
+    use_bert: bool = True,
+    batch_size: int = 8,
+    num_workers: int = 0,
+):
+    """
+    Returns train, dev, test DataLoaders.
+
+    Parameters
+    ----------
+    daic_root     : folder that contains the three *_split_Depression_AVEC2017.csv files
+    processed_dir : folder with audio_features/, text_features/, facial_features/
+    raw_audio_dir : (optional) raw DAIC-WOZ root for on-the-fly mel computation
+    task          : 'classification' | 'regression'
+    use_bert      : use BERT tokenizer for text
+    batch_size    : samples per batch
+    num_workers   : DataLoader workers (0 = main process, safe on Windows)
+    """
+    daic_root = Path(daic_root)
+
+    def _csv(split):
+        name = f'{split}_split_Depression_AVEC2017.csv'
+        p = daic_root / name
+        if not p.exists():
+            raise FileNotFoundError(f"Label file not found: {p}")
+        return str(p)
+
+    train_ds = DAICWOZDataset(_csv('train'), processed_dir, raw_audio_dir,
+                               task=task, use_bert=use_bert, augment=True)
+    dev_ds   = DAICWOZDataset(_csv('dev'),   processed_dir, raw_audio_dir,
+                               task=task, use_bert=use_bert, augment=False)
+    # Test labels may not have PHQ8_Score; load dev labels as proxy if missing
+    try:
+        test_ds = DAICWOZDataset(_csv('test'), processed_dir, raw_audio_dir,
+                                  task=task, use_bert=use_bert, augment=False)
+    except FileNotFoundError:
+        test_ds = None
+
+    use_pin = torch.cuda.is_available()
+    train_loader = DataLoader(train_ds, batch_size=batch_size,
+                              shuffle=True, num_workers=num_workers,
+                              pin_memory=use_pin, drop_last=True)
+    dev_loader   = DataLoader(dev_ds,   batch_size=batch_size,
+                              shuffle=False, num_workers=num_workers,
+                              pin_memory=use_pin)
+    test_loader  = DataLoader(test_ds,  batch_size=batch_size,
+                              shuffle=False, num_workers=num_workers,
+                              pin_memory=use_pin) if test_ds else None
+
+    return train_loader, dev_loader, test_loader

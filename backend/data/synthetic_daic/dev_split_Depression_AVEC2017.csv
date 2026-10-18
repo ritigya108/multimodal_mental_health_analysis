@@ -1,0 +1,9 @@
+Participant_ID,PHQ8_Score,PHQ8_Binary,Gender
+400,11,1,Female
+401,2,0,Female
+402,22,1,Female
+403,0,0,Male
+404,4,0,Female
+405,6,0,Female
+406,3,0,Male
+407,6,0,Male

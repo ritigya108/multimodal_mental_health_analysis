@@ -109,6 +109,30 @@ const apiService = {
     });
     return response.data;
   },
+
+  // Multimodal Analysis
+  // Sends text (required) + optional audio/video files as multipart form data.
+  // Returns the full analysis result object from the backend.
+  multimodalAnalyze: async (text, audioFile = null, videoFile = null) => {
+    const formData = new FormData();
+    formData.append('text', text);
+    formData.append('user_id', 'react_user');
+    if (audioFile) formData.append('audio_file', audioFile);
+    if (videoFile) formData.append('video_file', videoFile);
+
+    const response = await axios.post(
+      `${API_BASE_URL}/api/multimodal/analyze`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  },
+
+  // Text-only shortcut (JSON body — no file uploads needed)
+  multimodalAnalyzeText: async (text) => {
+    const response = await api.post('/api/multimodal/analyze/text', { text });
+    return response.data;
+  },
 };
 
 export default apiService;

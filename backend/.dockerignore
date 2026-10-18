@@ -1,0 +1,42 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# Environment secrets
+.env
+*.env
+
+# Data directories (mount as volumes instead)
+data/eatd_processed/
+data/synthetic_daic/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+*.log
+*.tmp
+
+# Keep checkpoints directory stub but not contents
+checkpoints/**/*.pt
+checkpoints/**/*.json

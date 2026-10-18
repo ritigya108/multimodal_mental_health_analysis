@@ -76,8 +76,7 @@ Thumbs.db
 *.sqlite3
 mental_health.db
 
-# Streamlit
+# Streamlit — only ignore secrets, not config (config.toml needed for Streamlit Cloud)
 .streamlit/secrets.toml
-.streamlit/config.toml
 
 # Made with Bob

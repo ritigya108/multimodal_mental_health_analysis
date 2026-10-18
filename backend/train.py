@@ -1,0 +1,393 @@
+"""
+DAIC-WOZ Multimodal Training Script
+=====================================
+Usage
+-----
+  python train.py --daic_root /data/daic-woz \\
+                  --processed_dir /data/daic-woz/processed \\
+                  --task classification \\
+                  --epochs 30 \\
+                  --batch_size 8 \\
+                  --lr 2e-4 \\
+                  --output_dir ./checkpoints
+
+Arguments
+---------
+  --daic_root     : folder containing *_split_Depression_AVEC2017.csv label files
+  --processed_dir : folder containing audio_features/, text_features/, facial_features/
+  --raw_audio_dir : (optional) raw DAIC-WOZ root for on-the-fly mel extraction
+  --task          : 'classification' or 'regression'
+  --epochs        : number of training epochs (default 30)
+  --batch_size    : batch size (default 8 — DAIC-WOZ is small)
+  --lr            : learning rate (default 2e-4)
+  --embed_dim     : shared modality embedding dimension (default 256)
+  --dropout       : dropout probability (default 0.3)
+  --freeze_bert   : freeze BERT body (recommended; set 0 to fine-tune fully)
+  --output_dir    : directory to save checkpoints and logs (default ./checkpoints)
+  --resume        : path to a checkpoint to resume from
+  --seed          : random seed (default 42)
+  --no_cuda       : force CPU training
+"""
+
+import argparse
+import json
+import os
+import random
+import time
+from pathlib import Path
+
+import numpy as np
+import torch
+import torch.nn as nn
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from sklearn.metrics import (
+    f1_score, precision_score, recall_score, accuracy_score,
+    classification_report,
+)
+
+from dataset import get_dataloaders
+from multimodal_model import build_model, count_parameters
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Metrics
+# ──────────────────────────────────────────────────────────────────────────────
+
+def rmse(preds: np.ndarray, targets: np.ndarray) -> float:
+    return float(np.sqrt(np.mean((preds - targets) ** 2)))
+
+
+def mae(preds: np.ndarray, targets: np.ndarray) -> float:
+    return float(np.mean(np.abs(preds - targets)))
+
+
+def compute_classification_metrics(preds: np.ndarray, targets: np.ndarray):
+    return {
+        'accuracy'  : float(accuracy_score(targets, preds)),
+        'f1'        : float(f1_score(targets, preds, zero_division=0)),
+        'precision' : float(precision_score(targets, preds, zero_division=0)),
+        'recall'    : float(recall_score(targets, preds, zero_division=0)),
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Training helpers
+# ──────────────────────────────────────────────────────────────────────────────
+
+def set_seed(seed: int):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def move_batch(batch, device):
+    return {k: (v.to(device) if torch.is_tensor(v) else v)
+            for k, v in batch.items()}
+
+
+def forward_batch(model, batch, task):
+    out = model(
+        audio     = batch['audio'],
+        text_ids  = batch['text_ids'],
+        text_mask = batch['text_mask'],
+        facial    = batch['facial'],
+    )
+    return out
+
+
+def compute_loss(out, label, task, criterion):
+    if task == 'classification':
+        return criterion(out, label)
+    else:
+        return criterion(out, label)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# One epoch of training
+# ──────────────────────────────────────────────────────────────────────────────
+
+def train_epoch(model, loader, optimizer, criterion, device, task, grad_clip=1.0):
+    model.train()
+    total_loss = 0.0
+    all_preds, all_labels = [], []
+
+    for batch in loader:
+        batch = move_batch(batch, device)
+        label = batch['label']
+
+        optimizer.zero_grad()
+        out  = forward_batch(model, batch, task)
+        loss = compute_loss(out, label, task, criterion)
+        loss.backward()
+        nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+        optimizer.step()
+
+        total_loss += loss.item()
+
+        if task == 'classification':
+            preds = out.argmax(dim=1).cpu().numpy()
+            all_preds.extend(preds.tolist())
+            all_labels.extend(label.cpu().numpy().tolist())
+        else:
+            all_preds.extend(out.detach().cpu().numpy().tolist())
+            all_labels.extend(label.cpu().numpy().tolist())
+
+    avg_loss = total_loss / max(len(loader), 1)
+    all_preds  = np.array(all_preds)
+    all_labels = np.array(all_labels)
+
+    if task == 'classification':
+        metrics = compute_classification_metrics(all_preds, all_labels)
+    else:
+        metrics = {'rmse': rmse(all_preds, all_labels),
+                   'mae' : mae(all_preds, all_labels)}
+
+    return avg_loss, metrics
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Evaluation
+# ──────────────────────────────────────────────────────────────────────────────
+
+@torch.no_grad()
+def evaluate(model, loader, criterion, device, task):
+    model.eval()
+    total_loss = 0.0
+    all_preds, all_labels = [], []
+
+    for batch in loader:
+        batch = move_batch(batch, device)
+        label = batch['label']
+
+        out  = forward_batch(model, batch, task)
+        loss = compute_loss(out, label, task, criterion)
+        total_loss += loss.item()
+
+        if task == 'classification':
+            preds = out.argmax(dim=1).cpu().numpy()
+            all_preds.extend(preds.tolist())
+            all_labels.extend(label.cpu().numpy().tolist())
+        else:
+            all_preds.extend(out.cpu().numpy().tolist())
+            all_labels.extend(label.cpu().numpy().tolist())
+
+    avg_loss = total_loss / max(len(loader), 1)
+    all_preds  = np.array(all_preds)
+    all_labels = np.array(all_labels)
+
+    if task == 'classification':
+        metrics = compute_classification_metrics(all_preds, all_labels)
+    else:
+        metrics = {'rmse': rmse(all_preds, all_labels),
+                   'mae' : mae(all_preds, all_labels)}
+
+    return avg_loss, metrics, all_preds, all_labels
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Main
+# ──────────────────────────────────────────────────────────────────────────────
+
+def parse_args():
+    p = argparse.ArgumentParser(description='Train multimodal depression model on DAIC-WOZ')
+    p.add_argument('--daic_root',     required=True,
+                   help='Folder with *_split_Depression_AVEC2017.csv files')
+    p.add_argument('--processed_dir', required=True,
+                   help='Folder with audio_features/, text_features/, facial_features/')
+    p.add_argument('--raw_audio_dir', default=None,
+                   help='(Optional) raw DAIC-WOZ root for on-the-fly mel extraction')
+    p.add_argument('--task',          default='classification',
+                   choices=['classification', 'regression'])
+    p.add_argument('--epochs',        type=int,   default=30)
+    p.add_argument('--batch_size',    type=int,   default=8)
+    p.add_argument('--lr',            type=float, default=2e-4)
+    p.add_argument('--embed_dim',     type=int,   default=256)
+    p.add_argument('--dropout',       type=float, default=0.3)
+    p.add_argument('--freeze_bert',   type=int,   default=1,
+                   help='1=freeze BERT body (default), 0=fine-tune fully')
+    p.add_argument('--output_dir',    default='./checkpoints')
+    p.add_argument('--resume',        default=None,
+                   help='Path to checkpoint to resume from')
+    p.add_argument('--seed',          type=int,   default=42)
+    p.add_argument('--no_cuda',       action='store_true')
+    p.add_argument('--num_workers',   type=int,   default=0,
+                   help='DataLoader workers (0=main process, safe on Windows)')
+    return p.parse_args()
+
+
+def main():
+    args = parse_args()
+    set_seed(args.seed)
+
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── Device ──────────────────────────────────────────────────────────
+    use_cuda = torch.cuda.is_available() and not args.no_cuda
+    device   = torch.device('cuda' if use_cuda else 'cpu')
+    print(f"[train] Device: {device}")
+
+    # ── Data ────────────────────────────────────────────────────────────
+    print("[train] Loading datasets …")
+    train_loader, dev_loader, _ = get_dataloaders(
+        daic_root     = args.daic_root,
+        processed_dir = args.processed_dir,
+        raw_audio_dir = args.raw_audio_dir,
+        task          = args.task,
+        use_bert      = True,
+        batch_size    = args.batch_size,
+        num_workers   = args.num_workers,
+    )
+    print(f"[train] Train batches: {len(train_loader)}  Dev batches: {len(dev_loader)}")
+
+    # ── Model ────────────────────────────────────────────────────────────
+    model = build_model(
+        task        = args.task,
+        freeze_bert = bool(args.freeze_bert),
+        embed_dim   = args.embed_dim,
+        dropout     = args.dropout,
+    ).to(device)
+    print(f"[train] Trainable parameters: {count_parameters(model):,}")
+
+    # ── Loss ─────────────────────────────────────────────────────────────
+    if args.task == 'classification':
+        # Compute class weights from training labels to handle imbalance
+        # (EATD: ~80% non-depressed / 20% depressed; DAIC-WOZ: ~71% / 29%)
+        import pandas as _pd
+        _label_csv = Path(args.daic_root) / 'train_split_Depression_AVEC2017.csv'
+        if _label_csv.exists():
+            _df = _pd.read_csv(_label_csv)
+            _n0 = int((_df['PHQ8_Binary'] == 0).sum())
+            _n1 = int((_df['PHQ8_Binary'] == 1).sum())
+            _total = _n0 + _n1
+            # inverse-frequency weighting
+            _w0 = round(_total / (2.0 * max(_n0, 1)), 3)
+            _w1 = round(_total / (2.0 * max(_n1, 1)), 3)
+            print(f"[train] Class weights: non-depressed={_w0:.2f}  depressed={_w1:.2f}  "
+                  f"(n0={_n0}, n1={_n1})")
+        else:
+            _w0, _w1 = 1.0, 4.0   # safe fallback
+        class_weights = torch.tensor([_w0, _w1], dtype=torch.float32).to(device)
+        criterion = nn.CrossEntropyLoss(weight=class_weights)
+    else:
+        criterion = nn.MSELoss()
+
+    # ── Optimiser / Scheduler ────────────────────────────────────────────
+    optimizer = AdamW(
+        filter(lambda p: p.requires_grad, model.parameters()),
+        lr=args.lr, weight_decay=1e-4
+    )
+    scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
+
+    # ── Resume ───────────────────────────────────────────────────────────
+    start_epoch = 0
+    best_metric = float('inf') if args.task == 'regression' else 0.0
+    history = {'train': [], 'dev': []}
+
+    if args.resume and Path(args.resume).exists():
+        ckpt = torch.load(args.resume, map_location=device)
+        model.load_state_dict(ckpt['model_state'])
+        optimizer.load_state_dict(ckpt['optimizer_state'])
+        start_epoch  = ckpt.get('epoch', 0) + 1
+        best_metric  = ckpt.get('best_metric', best_metric)
+        history      = ckpt.get('history', history)
+        print(f"[train] Resumed from epoch {start_epoch}")
+
+    # ── Training loop ────────────────────────────────────────────────────
+    print(f"\n[train] Starting training  (task={args.task}, epochs={args.epochs})")
+    print("=" * 70)
+
+    for epoch in range(start_epoch, args.epochs):
+        t0 = time.time()
+
+        train_loss, train_metrics = train_epoch(
+            model, train_loader, optimizer, criterion, device, args.task
+        )
+        dev_loss, dev_metrics, dev_preds, dev_labels = evaluate(
+            model, dev_loader, criterion, device, args.task
+        )
+        scheduler.step()
+
+        elapsed = time.time() - t0
+        history['train'].append({'epoch': epoch, 'loss': train_loss, **train_metrics})
+        history['dev'].append(  {'epoch': epoch, 'loss': dev_loss,   **dev_metrics})
+
+        # ── Print progress ───────────────────────────────────────────────
+        if args.task == 'classification':
+            print(
+                f"Epoch {epoch+1:03d}/{args.epochs} | "
+                f"Train loss={train_loss:.4f} acc={train_metrics['accuracy']:.3f} "
+                f"f1={train_metrics['f1']:.3f} | "
+                f"Dev loss={dev_loss:.4f} acc={dev_metrics['accuracy']:.3f} "
+                f"f1={dev_metrics['f1']:.3f} | "
+                f"{elapsed:.1f}s"
+            )
+            current_metric = dev_metrics['f1']
+            is_best = current_metric > best_metric
+        else:
+            print(
+                f"Epoch {epoch+1:03d}/{args.epochs} | "
+                f"Train loss={train_loss:.4f} RMSE={train_metrics['rmse']:.3f} "
+                f"MAE={train_metrics['mae']:.3f} | "
+                f"Dev loss={dev_loss:.4f} RMSE={dev_metrics['rmse']:.3f} "
+                f"MAE={dev_metrics['mae']:.3f} | "
+                f"{elapsed:.1f}s"
+            )
+            current_metric = dev_metrics['rmse']
+            is_best = current_metric < best_metric
+
+        # ── Save checkpoint ──────────────────────────────────────────────
+        ckpt = {
+            'epoch'          : epoch,
+            'model_state'    : model.state_dict(),
+            'optimizer_state': optimizer.state_dict(),
+            'best_metric'    : best_metric,
+            'history'        : history,
+            'args'           : vars(args),
+        }
+        torch.save(ckpt, output_dir / 'last.pt')
+
+        if is_best:
+            best_metric = current_metric
+            torch.save(ckpt, output_dir / 'best.pt')
+            print(f"  [BEST] New best saved  (metric={best_metric:.4f})")
+
+    # ── Final evaluation on dev set ──────────────────────────────────────
+    print("\n" + "=" * 70)
+    best_pt = output_dir / 'best.pt'
+    if not best_pt.exists():
+        # No best.pt was saved (e.g. F1 never improved above 0) — use last.pt
+        print("[train] No best.pt found — using last.pt for final evaluation.")
+        best_pt = output_dir / 'last.pt'
+    print(f"[train] Final evaluation on dev set using {best_pt.name} …")
+    best_ckpt = torch.load(best_pt, map_location=device)
+    model.load_state_dict(best_ckpt['model_state'])
+    _, final_metrics, final_preds, final_labels = evaluate(
+        model, dev_loader, criterion, device, args.task
+    )
+
+    print("\n[train] Final Dev Metrics:")
+    for k, v in final_metrics.items():
+        print(f"  {k}: {v:.4f}")
+
+    if args.task == 'classification':
+        print("\nClassification Report:")
+        print(classification_report(
+            final_labels, final_preds,
+            target_names=['Non-Depressed', 'Depressed']
+        ))
+
+    # ── Save history ─────────────────────────────────────────────────────
+    with open(output_dir / 'history.json', 'w') as f:
+        json.dump(history, f, indent=2)
+    with open(output_dir / 'final_metrics.json', 'w') as f:
+        json.dump(final_metrics, f, indent=2)
+
+    print(f"\n[train] Done. Checkpoints saved to: {output_dir}")
+
+
+if __name__ == '__main__':
+    main()
