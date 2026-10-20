@@ -212,13 +212,6 @@ function MultimodalAnalysis() {
         </Typography>
       </Box>
 
-      {/* ── Info banner ─────────────────────────────────────────────────── */}
-      <Alert severity="info" sx={{ mb: 3 }}>
-        <strong>No dataset required:</strong> The backend runs a linguistic heuristic today
-        and automatically switches to neural inference once a trained model checkpoint is present.
-        The results format is identical in both modes.
-      </Alert>
-
       {/* ── Input section ───────────────────────────────────────────────── */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
 
