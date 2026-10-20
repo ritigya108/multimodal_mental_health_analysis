@@ -160,8 +160,17 @@ function MultimodalAnalysis() {
       setResults(data);
       setActiveTab(0);
     } catch (err) {
-      const msg = err.response?.data?.detail || err.message || 'Analysis failed. Is the backend running?';
-      setError(msg);
+      // FastAPI 422 detail is an array of objects [{type,loc,msg,input}] — stringify it
+      const detail = err.response?.data?.detail;
+      let msg;
+      if (Array.isArray(detail)) {
+        msg = detail.map((d) => d.msg || JSON.stringify(d)).join('; ');
+      } else if (detail && typeof detail === 'object') {
+        msg = JSON.stringify(detail);
+      } else {
+        msg = detail || err.message || 'Analysis failed. Is the backend running?';
+      }
+      setError(String(msg));
     } finally {
       setAnalyzing(false);
     }
@@ -374,7 +383,7 @@ function MultimodalAnalysis() {
       {/* ── Error ───────────────────────────────────────────────────────── */}
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
+          {String(error)}
         </Alert>
       )}
 
