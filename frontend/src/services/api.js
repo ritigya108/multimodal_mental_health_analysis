@@ -1,7 +1,10 @@
 import axios from 'axios';
 
-// API base URL - change this to your backend URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// API base URL.
+// In development the React dev server proxies /api/* to localhost:8000
+// (see "proxy" in package.json), so we use a relative base URL.
+// In production set REACT_APP_API_URL to the deployed backend URL.
+const API_BASE_URL = process.env.REACT_APP_API_URL || '';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -120,10 +123,11 @@ const apiService = {
     if (audioFile) formData.append('audio_file', audioFile);
     if (videoFile) formData.append('video_file', videoFile);
 
-    const response = await axios.post(
-      `${API_BASE_URL}/api/multimodal/analyze`,
+    // Do NOT set Content-Type manually — axios/browser must set it with the
+    // multipart boundary automatically, otherwise the server cannot parse fields.
+    const response = await api.post(
+      '/api/multimodal/analyze',
       formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
     );
     return response.data;
   },
