@@ -123,12 +123,13 @@ const apiService = {
     if (audioFile) formData.append('audio_file', audioFile);
     if (videoFile) formData.append('video_file', videoFile);
 
-    // The api instance has 'Content-Type: application/json' as a default header.
-    // We must DELETE it so the browser can set 'multipart/form-data; boundary=...'
-    // automatically — without the boundary FastAPI cannot parse the form fields.
-    const response = await api.post('/api/multimodal/analyze', formData, {
-      headers: { 'Content-Type': undefined },
-    });
+    // Use axios directly (not the api instance) so the default
+    // Content-Type: application/json header is not present at all.
+    // The browser then sets multipart/form-data with the correct boundary automatically.
+    const response = await axios.post(
+      (process.env.REACT_APP_API_URL || 'http://localhost:8000') + '/api/multimodal/analyze',
+      formData
+    );
     return response.data;
   },
 
