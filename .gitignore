@@ -79,4 +79,3 @@ mental_health.db
 # Streamlit — only ignore secrets, not config (config.toml needed for Streamlit Cloud)
 .streamlit/secrets.toml
 
-# Made with Bob
