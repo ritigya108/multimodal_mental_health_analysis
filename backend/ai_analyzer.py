@@ -253,4 +253,4 @@ class MentalHealthAnalyzer:
 # Initialize global analyzer instance
 analyzer = MentalHealthAnalyzer()
 
-# Made with Bob
+
