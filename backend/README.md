@@ -4,13 +4,13 @@ FastAPI-based backend for AI-powered mental health monitoring and support system
 
 ## Features
 
-- 🔐 User authentication and profile management
-- 📊 Mood tracking and visualization
-- 📝 Journal entries with AI sentiment analysis
-- 🤖 AI-powered risk assessment
-- 💬 Chatbot for mental health support
-- 📈 Personalized recommendations
-- ⚠️ Crisis detection and alerts
+-  User authentication and profile management
+-  Mood tracking and visualization
+- Journal entries with AI sentiment analysis
+- AI-powered risk assessment
+- Chatbot for mental health support
+- Personalized recommendations
+-  Crisis detection and alerts
 
 ## Tech Stack
 
