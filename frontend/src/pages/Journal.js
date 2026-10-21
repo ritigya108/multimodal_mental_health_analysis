@@ -345,4 +345,4 @@ function Journal() {
 
 export default Journal;
 
-// Made with Bob
+
