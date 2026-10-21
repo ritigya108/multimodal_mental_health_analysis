@@ -1,3 +1,0 @@
-# System packages installed via apt-get before pip
-# Required for audio/scientific libraries on Streamlit Cloud
-libsndfile1
