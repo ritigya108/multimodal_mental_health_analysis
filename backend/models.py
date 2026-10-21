@@ -83,4 +83,4 @@ class Resource(Base):
     priority = Column(String)  # low, medium, high
     created_at = Column(DateTime, default=datetime.utcnow)
 
-# Made with Bob
+
