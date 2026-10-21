@@ -204,7 +204,7 @@ function MultimodalAnalysis() {
       {/* ── Page header ────────────────────────────────────────────────── */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" fontWeight={700} gutterBottom>
-          🎭 Multimodal Mental Health Analysis
+          Multimodal Mental Health Analysis
         </Typography>
         <Typography variant="body1" color="text.secondary">
           Submit a text transcript (required) and optionally an audio or video file.
