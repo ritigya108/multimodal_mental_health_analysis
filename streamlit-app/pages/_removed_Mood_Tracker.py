@@ -2,9 +2,9 @@ import streamlit as st
 from datetime import datetime
 import pandas as pd
 
-st.set_page_config(page_title="Mood Tracker", page_icon="😊", layout="wide")
+st.set_page_config(page_title="Mood Tracker", page_icon="ðŸ˜Š", layout="wide")
 
-st.title("Mood Tracker 😊")
+st.title("Mood Tracker ðŸ˜Š")
 st.markdown("### How are you feeling today?")
 
 # Mood selection
@@ -23,8 +23,8 @@ with col1:
     
     # Emoji display based on mood
     mood_emojis = {
-        1: "😢", 2: "😟", 3: "😕", 4: "😐", 5: "😊",
-        6: "🙂", 7: "😃", 8: "😄", 9: "😁", 10: "🤩"
+        1: "ðŸ˜¢", 2: "ðŸ˜Ÿ", 3: "ðŸ˜•", 4: "ðŸ˜", 5: "ðŸ˜Š",
+        6: "ðŸ™‚", 7: "ðŸ˜ƒ", 8: "ðŸ˜„", 9: "ðŸ˜", 10: "ðŸ¤©"
     }
     
     mood_labels = {
@@ -59,11 +59,11 @@ with col1:
             'notes': notes
         })
         
-        st.success("✅ Mood logged successfully!")
+        st.success("âœ… Mood logged successfully!")
         st.balloons()
 
 with col2:
-    st.subheader("💡 Mood Tracking Tips")
+    st.subheader("ðŸ’¡ Mood Tracking Tips")
     
     st.info("""
     **Be Honest**
@@ -95,7 +95,7 @@ with col2:
     It's okay to not be okay. Consider talking to someone.
     """)
     
-    if st.button("💬 Chat with AI", use_container_width=True):
+    if st.button("ðŸ’¬ Chat with AI", use_container_width=True):
         st.switch_page("pages/3_AI_Chat.py")
 
 st.divider()
@@ -113,7 +113,7 @@ for i, col in enumerate(cols, 1):
 st.divider()
 
 # Mood history
-st.subheader("📊 Your Mood History")
+st.subheader("ðŸ“Š Your Mood History")
 
 if 'mood_logs' in st.session_state and st.session_state.mood_logs:
     df = pd.DataFrame(st.session_state.mood_logs)
@@ -131,6 +131,4 @@ else:
     st.info("No mood logs yet. Start tracking your mood above!")
 
 st.divider()
-st.caption("💙 Your mental health matters. Keep tracking to understand your patterns better.")
-
-# Made with Bob
+st.caption("ðŸ’™ Your mental health matters. Keep tracking to understand your patterns better.")

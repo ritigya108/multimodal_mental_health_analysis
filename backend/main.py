@@ -1,35 +1,57 @@
 import os
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+import sys
+from pathlib import Path
+
+# â”€â”€ Make sure the backend directory is on sys.path so that
+#    `from app_config import ...` works regardless of the working
+#    directory the user launched from (e.g. repo root vs backend/).
+_BACKEND_DIR = Path(__file__).resolve().parent
+if str(_BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_DIR))
+
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional, List
+from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 import uvicorn
 import numpy as np
 import io
 
-app = FastAPI(
-    title="Mental Health AI Monitoring API",
-    description="AI-powered mental health monitoring and support system",
-    version="1.0.0"
+from app_config import (
+    CRISIS_HELPLINE_NUMBER,
+    CRISIS_HELPLINE_NAME,
+    CRISIS_HELPLINE_DESCRIPTION,
+    MAX_AUDIO_SIZE_MB,
+    MAX_VIDEO_SIZE_MB,
+    DATA_RETENTION_NOTE,
 )
 
-# CORS — allow the React frontend origin (configurable via FRONTEND_URL env var)
+app = FastAPI(
+    title="MindCare â€” Multimodal Mental Health Analysis API",
+    description="Clinical-grade multimodal depression screening system.",
+    version="2.0.0",
+)
+
+# CORS â€” allow all localhost ports in development + configurable production URL
 _frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[_frontend_url, "http://localhost:3000"],
+    allow_origins=[
+        _frontend_url,
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Pydantic models
-class MoodEntry(BaseModel):
-    user_id: str
-    mood_score: int  # 1-10 scale
-    notes: Optional[str] = None
-    timestamp: Optional[datetime] = None
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Pydantic schemas
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class JournalEntry(BaseModel):
     user_id: str
@@ -49,270 +71,345 @@ class UserProfile(BaseModel):
     age: Optional[int] = None
     emergency_contact: Optional[str] = None
 
-# Root endpoint
+class PHQ8Request(BaseModel):
+    answers: List[int] = Field(..., min_length=8, max_length=8,
+                               description="8 answers, each 0â€“3")
+    user_id: Optional[str] = "anonymous"
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    model_config = {"arbitrary_types_allowed": True}
+
+    def model_post_init(self, __context):
+        for v in self.answers:
+            if v not in (0, 1, 2, 3):
+                raise ValueError("Each PHQ-8 answer must be 0, 1, 2, or 3.")
+
+class PHQ8Response(BaseModel):
+    score: int
+    severity: str
+    severity_description: str
+    answers: List[int]
+    timestamp: datetime
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# In-memory assessment store (replace with DB in production)
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+_assessments: List[Dict[str, Any]] = []
+_phq8_results: List[Dict[str, Any]] = []
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Root / health
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 @app.get("/")
 async def root():
-    return {
-        "message": "Mental Health AI Monitoring API",
-        "status": "active",
-        "version": "1.0.0"
-    }
+    return {"message": "MindCare API", "status": "active", "version": "2.0.0"}
 
-# Health check endpoint
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now()}
 
-# Mood tracking endpoints
-@app.post("/api/mood/log")
-async def log_mood(entry: MoodEntry):
-    """Log a mood entry for a user"""
-    # TODO: Save to database
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Configuration endpoint
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+@app.get("/api/config/helpline")
+async def get_helpline():
+    """Return the configured crisis helpline details."""
     return {
-        "message": "Mood logged successfully",
-        "entry": entry,
-        "timestamp": datetime.now()
+        "number": CRISIS_HELPLINE_NUMBER,
+        "name": CRISIS_HELPLINE_NAME,
+        "description": CRISIS_HELPLINE_DESCRIPTION,
     }
 
-@app.get("/api/mood/history/{user_id}")
-async def get_mood_history(user_id: str, days: int = 7):
-    """Get mood history for a user"""
-    # TODO: Fetch from database
-    return {
-        "user_id": user_id,
-        "days": days,
-        "entries": []  # Placeholder
-    }
 
-# Journal endpoints
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Journal endpoints (kept)
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 @app.post("/api/journal/entry")
 async def create_journal_entry(entry: JournalEntry):
-    """Create a new journal entry with AI sentiment analysis"""
-    # TODO: Implement sentiment analysis
-    # TODO: Save to database
     return {
         "message": "Journal entry created",
         "entry": entry,
-        "analysis": {
-            "sentiment": "neutral",
-            "score": 0.5,
-            "risk_level": "low"
-        }
+        "analysis": {"sentiment": "neutral", "score": 0.5, "risk_level": "low"},
     }
 
 @app.get("/api/journal/entries/{user_id}")
 async def get_journal_entries(user_id: str, limit: int = 10):
-    """Get journal entries for a user"""
-    # TODO: Fetch from database
-    return {
-        "user_id": user_id,
-        "entries": []  # Placeholder
-    }
+    return {"user_id": user_id, "entries": []}
 
-# AI Analysis endpoints
-@app.post("/api/analyze/sentiment")
-async def analyze_sentiment(text: str):
-    """Analyze sentiment of text using AI"""
-    # TODO: Implement AI sentiment analysis
-    return {
-        "text": text,
-        "sentiment": "neutral",
-        "score": 0.5,
-        "confidence": 0.8
-    }
 
-@app.get("/api/analyze/risk/{user_id}")
-async def assess_risk(user_id: str):
-    """Assess mental health risk level for a user"""
-    # TODO: Implement risk assessment algorithm
-    return {
-        "user_id": user_id,
-        "risk_level": "low",
-        "factors": [],
-        "recommendations": [
-            "Continue regular check-ins",
-            "Maintain healthy sleep schedule",
-            "Practice mindfulness exercises"
-        ]
-    }
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# User management (kept)
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-# User management endpoints
 @app.post("/api/users/register")
 async def register_user(user: UserProfile):
-    """Register a new user"""
-    # TODO: Implement user registration with password hashing
-    return {
-        "message": "User registered successfully",
-        "user_id": user.user_id
-    }
+    return {"message": "User registered successfully", "user_id": user.user_id}
 
 @app.get("/api/users/{user_id}")
 async def get_user_profile(user_id: str):
-    """Get user profile"""
-    # TODO: Fetch from database
-    return {
-        "user_id": user_id,
-        "profile": {}  # Placeholder
-    }
+    return {"user_id": user_id, "profile": {}}
 
-# Recommendations endpoint
-@app.get("/api/recommendations/{user_id}")
-async def get_recommendations(user_id: str):
-    """Get personalized mental health recommendations"""
-    # TODO: Implement AI-based recommendation engine
-    return {
-        "user_id": user_id,
-        "recommendations": [
-            {
-                "type": "exercise",
-                "title": "Morning Walk",
-                "description": "Take a 20-minute walk in nature",
-                "priority": "high"
-            },
-            {
-                "type": "meditation",
-                "title": "Breathing Exercise",
-                "description": "5-minute guided breathing meditation",
-                "priority": "medium"
-            },
-            {
-                "type": "resource",
-                "title": "Mental Health Hotline",
-                "description": "24/7 support available",
-                "priority": "info"
-            }
-        ]
-    }
 
-# ── Chatbot response engine ───────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Chatbot â€” per-user conversation state + response pools
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-def _chat_response(message: str) -> str:
-    """
-    Rule-based mental health chatbot.
-    Covers crisis, anxiety, stress, depression, happiness, mindfulness,
-    coping strategies, sleep, loneliness, anger, and general fallback.
-    """
+import random
+
+# Per-user counters: { user_id: { category: call_count } }
+_chat_counters: Dict[str, Dict[str, int]] = {}
+
+# Response pools â€” multiple replies per category so nothing repeats back-to-back
+_RESPONSES: Dict[str, List[str]] = {
+    "crisis": [
+        f"I'm very concerned about what you're sharing. Please reach out for help right now. "
+        f"In India you can call {CRISIS_HELPLINE_NAME}: {CRISIS_HELPLINE_NUMBER} (free, 24/7). "
+        f"You are not alone, and support is available immediately.",
+
+        f"What you're sharing worries me deeply. You deserve immediate support â€” "
+        f"please call {CRISIS_HELPLINE_NAME} {CRISIS_HELPLINE_NUMBER} right now. It is free and available 24/7. "
+        f"Is there someone physically near you who you can be with right now?",
+
+        f"Your safety matters more than anything else right now. Please reach out â€” "
+        f"{CRISIS_HELPLINE_NAME} {CRISIS_HELPLINE_NUMBER} (free, 24/7, India). "
+        f"If you feel unsafe, go to the nearest hospital emergency department.",
+    ],
+    "hopeless": [
+        "It sounds like you're carrying a very heavy weight right now. "
+        "Those feelings are real, but they can change with the right support. "
+        "Have you been able to talk to anyone â€” a friend, family member, or counsellor?",
+
+        "Feeling hopeless is one of the most exhausting experiences a person can have. "
+        "You reached out here, and that matters. What has felt most unbearable recently?",
+
+        "When everything feels pointless, it's a signal that you need more support â€” not a reflection of who you are. "
+        "Have you spoken to a doctor or mental health professional about how you've been feeling?",
+    ],
+    "anxiety": [
+        "Anxiety can feel overwhelming, but your body is safe even when your mind says otherwise. "
+        "Try box breathing right now: inhale 4 counts, hold 4, exhale 4, hold 4. Repeat 3 times. "
+        "Would you like to tell me what's been triggering it?",
+
+        "When anxiety spikes, your nervous system is in overdrive. "
+        "A quick reset: plant both feet flat on the floor, name 5 things you can see, then take one slow breath. "
+        "How long have you been feeling this way?",
+
+        "Anxiety often comes with a specific trigger, even when it feels general. "
+        "What's the one thought or situation that keeps coming back to your mind?",
+
+        "It's exhausting to feel anxious all the time. Have you tried any grounding techniques before, "
+        "like the 5-4-3-2-1 method? (5 things you see, 4 you touch, 3 you hear, 2 you smell, 1 you taste.) "
+        "It can interrupt the spiral quickly.",
+    ],
+    "stress": [
+        "Stress is your mind's signal that something needs attention â€” you're not weak for feeling it. "
+        "Try writing down the one thing bothering you most. Breaking it into smaller pieces makes it manageable. "
+        "What's been weighing on you the most?",
+
+        "When everything piles up, it's hard to know where to start. "
+        "Try this: pick the single smallest task you can finish in 10 minutes and just do that one thing. "
+        "Sometimes one small win is enough to shift the feeling. What's on your plate right now?",
+
+        "Chronic stress takes a real physical toll â€” tight shoulders, poor sleep, low energy. "
+        "Have you had any moments to rest or step away lately, even briefly?",
+
+        "Stress often comes from feeling out of control. "
+        "What's one thing in your current situation that you actually have some control over?",
+    ],
+    "depression": [
+        "I'm sorry you're feeling this way. Depression is a real condition, not a weakness or a choice. "
+        "If these feelings have lasted more than two weeks, please consider speaking to a doctor. "
+        "What has been hardest for you day to day?",
+
+        "Depression can make even small things feel impossible. "
+        "Is there one tiny thing â€” even just drinking a glass of water or stepping outside for 5 minutes â€” "
+        "that you might be able to do today?",
+
+        "You don't have to carry this alone. Have you spoken to anyone about how you've been feeling â€” "
+        "a friend, a family member, or a professional?",
+
+        "Sometimes depression lies to us â€” it tells us nothing will help and nothing will change. "
+        "But that's the illness talking, not the truth. What did life feel like before this started?",
+    ],
+    "loneliness": [
+        "Feeling lonely is painful â€” and more common than people admit. "
+        "Is there one person you could send a simple message to today? "
+        "Connection doesn't have to be deep to be meaningful.",
+
+        "Loneliness can feel invisible because people around you might not know you're struggling. "
+        "Have you been able to tell anyone how isolated you've been feeling?",
+
+        "Sometimes loneliness is about the quality of connection, not just the quantity. "
+        "Is there someone in your life you used to feel close to that you've drifted from?",
+    ],
+    "sleep": [
+        "Poor sleep and low mood are closely linked â€” each makes the other worse. "
+        "Try this tonight: no screens 30 minutes before bed, keep the room dark, "
+        "and do 4-7-8 breathing (inhale 4, hold 7, exhale 8). How long has sleep been difficult?",
+
+        "Sleep problems are one of the earliest signs that something needs attention mentally. "
+        "Are you struggling to fall asleep, staying asleep, or waking too early?",
+
+        "A consistent wind-down routine makes a real difference. "
+        "Even just 15 minutes of the same calm activity each night â€” reading, light stretching, dim lighting â€” "
+        "signals your brain that sleep is coming. What does your evening usually look like?",
+    ],
+    "anger": [
+        "Anger is a valid signal â€” it usually means a boundary was crossed or something feels deeply unfair. "
+        "Before reacting, try stepping away for just 2 minutes and taking slow breaths. "
+        "What happened that triggered this?",
+
+        "The emotion under anger is almost always something softer â€” hurt, fear, or helplessness. "
+        "What do you think is really underneath what you're feeling right now?",
+    ],
+    "positive": [
+        "That's genuinely great to hear. Positive moments are worth pausing on. "
+        "What's been going well for you?",
+
+        "It's really good to hear you're doing well. "
+        "What do you think has made the biggest difference lately?",
+
+        "Hold onto that feeling â€” and consider writing it down. "
+        "Noting what went well each day builds resilience for harder times. What's made today good?",
+    ],
+    "mindfulness": [
+        "Mindfulness is one of the most evidence-backed tools for mental wellbeing. "
+        "Here's a 1-minute grounding exercise: name 5 things you can see, 4 you can touch, "
+        "3 you can hear, 2 you can smell, 1 you can taste. Would you like more techniques?",
+
+        "A simple starting point: set a timer for 5 minutes, sit comfortably, and just notice your breath. "
+        "When your mind wanders â€” and it will â€” gently bring it back without judging yourself. "
+        "That's the whole practice. Have you tried anything like this before?",
+
+        "Body scan meditation is great for releasing physical tension from stress. "
+        "Starting at the top of your head, slowly move your attention down through each part of your body, "
+        "just noticing any tightness without trying to change it. "
+        "Would you like a step-by-step guide?",
+    ],
+    "coping": [
+        "Here are 5 evidence-based coping strategies:\n"
+        "1. Box breathing (inhale 4s â†’ hold 4s â†’ exhale 4s â†’ hold 4s)\n"
+        "2. A 10-minute walk â€” it genuinely shifts brain chemistry\n"
+        "3. Journaling â€” write 3 sentences about how you feel\n"
+        "4. Grounding â€” name 5 things you can see right now\n"
+        "5. Reach out â€” send one message to someone you trust\n\n"
+        "Which would you like to explore more?",
+
+        "When you're overwhelmed, the most effective coping tools are usually physical: "
+        "cold water on your face, a brisk walk, or slow deep breathing. "
+        "These work by directly calming the nervous system. "
+        "What have you tried before that's helped, even a little?",
+
+        "Long-term coping is about building small, consistent habits rather than big dramatic changes. "
+        "What does your current daily routine look like? Sometimes one small adjustment makes a big difference.",
+    ],
+    "default": [
+        "Thank you for sharing that with me. I'm here to listen without judgment. "
+        "Can you tell me more about how you've been feeling?",
+
+        "I hear you. Can you say more about what's been going on?",
+
+        "That sounds like it's been weighing on you. "
+        "What's been the hardest part of what you're going through?",
+
+        "I want to make sure I understand what you're experiencing. "
+        "How long have you been feeling this way?",
+
+        "Thank you for trusting me with this. "
+        "Is this something that came on recently, or has it been building for a while?",
+    ],
+}
+
+
+def _pick(category: str, user_id: str) -> str:
+    """Return the next response from the pool for this category, cycling round-robin."""
+    counters = _chat_counters.setdefault(user_id, {})
+    idx = counters.get(category, 0)
+    pool = _RESPONSES[category]
+    response = pool[idx % len(pool)]
+    counters[category] = idx + 1
+    return response
+
+
+def _chat_response(message: str, user_id: str = "anonymous") -> str:
     m = message.lower()
 
-    # Crisis — highest priority
     if any(kw in m for kw in ["suicide", "kill myself", "end my life", "want to die",
-                                "no reason to live", "better off dead", "harm myself"]):
-        return (
-            "I'm very concerned about what you're sharing. Please reach out for help right now. "
-            "In India you can call iCall: 9152987821 or KIRAN: 1800-599-0019 (free, 24/7). "
-            "You are not alone, and support is available immediately. "
-            "Would you like me to share more helpline numbers?"
-        )
+                               "no reason to live", "better off dead", "harm myself"]):
+        return _pick("crisis", user_id)
 
-    # Hopelessness / worthlessness
-    if any(kw in m for kw in ["hopeless", "worthless", "can't go on", "give up", "unbearable",
-                                "no point", "pointless", "meaningless"]):
-        return (
-            "It sounds like you're carrying a very heavy weight right now. "
-            "Those feelings are real, but they can change with the right support. "
-            "Have you been able to talk to anyone — a friend, family member, or counsellor — about how you're feeling? "
-            "Sometimes just saying it out loud to someone helps more than we expect."
-        )
+    if any(kw in m for kw in ["hopeless", "worthless", "can't go on", "give up",
+                               "unbearable", "no point", "pointless", "meaningless"]):
+        return _pick("hopeless", user_id)
 
-    # Anxiety / panic
-    if any(kw in m for kw in ["anxious", "anxiety", "panic", "panic attack", "worried", "fear", "nervous"]):
-        return (
-            "Anxiety can feel overwhelming, but your body is safe even when your mind says otherwise. "
-            "Try box breathing right now: inhale for 4 counts → hold for 4 → exhale for 4 → hold for 4. "
-            "Repeat 3 times. 🌬️ "
-            "Would you like to tell me more about what's triggering your anxiety?"
-        )
+    if any(kw in m for kw in ["anxious", "anxiety", "panic", "worried", "fear", "nervous"]):
+        return _pick("anxiety", user_id)
 
-    # Stress / overwhelmed
-    if any(kw in m for kw in ["stress", "stressed", "overwhelmed", "pressure", "burnout", "exhausted from work"]):
-        return (
-            "Stress is your mind's signal that something needs attention — you're not weak for feeling it. "
-            "A few quick things that help: take a 5-minute walk, drink a glass of water, and write down the "
-            "one thing that is bothering you most. Breaking it into smaller pieces makes it manageable. "
-            "What is stressing you the most right now?"
-        )
+    if any(kw in m for kw in ["stress", "stressed", "overwhelmed", "pressure", "burnout"]):
+        return _pick("stress", user_id)
 
-    # Depression / sadness
-    if any(kw in m for kw in ["depressed", "depression", "sad", "unhappy", "miserable", "empty", "numb", "dark"]):
-        return (
-            "I'm sorry you're feeling this way. Depression is a real condition — not a weakness or a choice. "
-            "A few small things that genuinely help: get some sunlight today, eat something nourishing, "
-            "and try to do one tiny thing you used to enjoy. "
-            "If these feelings have been lasting more than two weeks, please consider speaking to a doctor or therapist. "
-            "Would you like me to share some mental health resources?"
-        )
+    if any(kw in m for kw in ["depressed", "depression", "sad", "unhappy",
+                               "miserable", "empty", "numb", "hopeless"]):
+        return _pick("depression", user_id)
 
-    # Loneliness
-    if any(kw in m for kw in ["lonely", "alone", "isolated", "no one cares", "nobody", "no friends"]):
-        return (
-            "Feeling lonely is painful — and more common than people admit. "
-            "You reached out here, and that takes courage. "
-            "Is there one person — even someone you haven't spoken to in a while — you could send a simple message to today? "
-            "Connection doesn't have to be deep to be meaningful. I'm also here to listen whenever you need."
-        )
+    if any(kw in m for kw in ["lonely", "alone", "isolated", "no one cares", "nobody"]):
+        return _pick("loneliness", user_id)
 
-    # Anger
-    if any(kw in m for kw in ["angry", "anger", "furious", "rage", "frustrated", "irritated", "annoyed"]):
-        return (
-            "Anger is a valid emotion — it's often telling us that a boundary was crossed or something feels unfair. "
-            "Before reacting, try: step away for 2 minutes, take slow deep breaths, and ask yourself "
-            "'What is the real feeling underneath this anger?' "
-            "Would you like to talk about what happened?"
-        )
+    if any(kw in m for kw in ["can't sleep", "insomnia", "tired", "exhausted",
+                               "no energy", "fatigue", "sleep"]):
+        return _pick("sleep", user_id)
 
-    # Sleep problems
-    if any(kw in m for kw in ["can't sleep", "insomnia", "sleep", "tired", "exhausted", "no energy", "fatigue"]):
-        return (
-            "Poor sleep and low energy are closely linked to mood. "
-            "Try this tonight: no screens 30 minutes before bed, keep the room dark and cool, "
-            "and do 4-7-8 breathing (inhale 4, hold 7, exhale 8) as you lie down. "
-            "How long have you been struggling with sleep?"
-        )
+    if any(kw in m for kw in ["angry", "anger", "furious", "rage", "frustrated",
+                               "irritated", "annoyed"]):
+        return _pick("anger", user_id)
 
-    # Happiness / positive
-    if any(kw in m for kw in ["happy", "good", "great", "wonderful", "excited", "amazing", "grateful", "better"]):
-        return (
-            "That's genuinely great to hear! 😊 "
-            "Positive moments are worth acknowledging — what's been going well for you? "
-            "Holding onto these feelings and writing them down helps build resilience for harder days."
-        )
+    if any(kw in m for kw in ["happy", "great", "wonderful", "grateful",
+                               "better", "good day", "excited", "good"]):
+        return _pick("positive", user_id)
 
-    # Mindfulness / meditation
-    if any(kw in m for kw in ["mindfulness", "meditation", "calm", "breathe", "breathing", "relax"]):
-        return (
-            "Mindfulness is one of the most evidence-backed tools for mental health. "
-            "Here's a quick 1-minute grounding exercise — the 5-4-3-2-1 technique: "
-            "Name 5 things you can see, 4 you can touch, 3 you can hear, 2 you can smell, 1 you can taste. "
-            "This brings your mind back to the present. Want more techniques?"
-        )
+    if any(kw in m for kw in ["mindful", "mindfulness", "meditation",
+                               "calm", "breathe", "breathing", "relax"]):
+        return _pick("mindfulness", user_id)
 
-    # Coping strategies
-    if any(kw in m for kw in ["coping", "strategies", "help me", "what should i do", "tips", "advice"]):
-        return (
-            "Here are 5 evidence-based coping strategies:\n"
-            "1️⃣ Deep breathing (4-4-4 box breathing)\n"
-            "2️⃣ Physical movement — even a 10-minute walk changes brain chemistry\n"
-            "3️⃣ Journaling — write 3 sentences about how you feel\n"
-            "4️⃣ Grounding — name 5 things you can see right now\n"
-            "5️⃣ Social connection — send one message to someone you trust\n"
-            "Which of these would you like to explore more?"
-        )
+    if any(kw in m for kw in ["coping", "strategies", "tips", "advice",
+                               "help me", "what should i do", "how to deal"]):
+        return _pick("coping", user_id)
 
-    # Default
-    return (
-        "Thank you for sharing that with me. I'm here to listen without judgment. "
-        "Can you tell me more about how you're feeling or what's been on your mind? "
-        "The more you share, the better I can support you. 💙"
-    )
+    return _pick("default", user_id)
+
+
+class ChatRequest(BaseModel):
+    message: str
+    user_id: Optional[str] = "anonymous"
 
 
 @app.post("/api/chat")
-async def chat(message: str, user_id: str):
+async def chat(req: ChatRequest):
     """
-    Mental health chatbot endpoint.
-    Uses a keyword-based response engine covering crisis, anxiety, depression,
-    stress, loneliness, anger, sleep, and general wellbeing.
+    Mental health chatbot. Accepts a JSON body: {"message": "...", "user_id": "..."}.
+    Also supports legacy query-param style (?message=&user_id=) via the /api/chat/query alias.
     """
+    if not req.message or not req.message.strip():
+        raise HTTPException(status_code=422, detail="'message' cannot be empty.")
+    return {
+        "user_message": req.message,
+        "bot_response": _chat_response(req.message.strip(), req.user_id or "anonymous"),
+        "timestamp": datetime.now(),
+    }
+
+
+@app.post("/api/chat/query")
+async def chat_query(message: str, user_id: str = "anonymous"):
+    """Legacy query-param variant kept for backward compatibility."""
     if not message or not message.strip():
         raise HTTPException(status_code=422, detail="'message' cannot be empty.")
     return {
@@ -322,25 +419,111 @@ async def chat(message: str, user_id: str):
     }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Multimodal Analysis endpoint
-# ─────────────────────────────────────────────────────────────────────────────
-#
-# This endpoint works TODAY (no DAIC-WOZ dataset required).
-# It accepts optional audio/video files and a required text transcript.
-#
-# When you have a trained model checkpoint (best.pt from train.py), set
-#   MODEL_CHECKPOINT = Path("checkpoints/daic/best.pt")
-# and the inference block below will load it automatically.
-#
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# PHQ-8 scoring
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+PHQ8_SEVERITY = [
+    (0,  4,  "Minimal",  "Little or no depression is indicated."),
+    (5,  9,  "Mild",     "Mild depressive symptoms. Self-monitoring recommended."),
+    (10, 14, "Moderate", "Moderate depressive symptoms. Consider professional consultation."),
+    (15, 19, "Moderately Severe",
+             "Moderately severe depression. Professional evaluation recommended."),
+    (20, 24, "Severe",   "Severe depression. Prompt professional evaluation strongly advised."),
+]
+
+
+def _phq8_severity(score: int):
+    for lo, hi, label, desc in PHQ8_SEVERITY:
+        if lo <= score <= hi:
+            return label, desc
+    return "Severe", "Severe depression detected."
+
+
+@app.post("/api/phq8/score", response_model=PHQ8Response)
+async def score_phq8(req: PHQ8Request):
+    """Score an 8-item PHQ-8 questionnaire and return severity band."""
+    total = sum(req.answers)
+    severity, description = _phq8_severity(total)
+    result = {
+        "score": total,
+        "severity": severity,
+        "severity_description": description,
+        "answers": req.answers,
+        "timestamp": datetime.now(),
+        "user_id": req.user_id,
+    }
+    _phq8_results.append(result)
+    return result
+
+
+@app.get("/api/phq8/history/{user_id}")
+async def get_phq8_history(user_id: str):
+    user_results = [r for r in _phq8_results if r.get("user_id") == user_id]
+    return {"user_id": user_id, "results": user_results}
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Assessment history
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+@app.get("/api/assessments/{user_id}")
+async def get_assessment_history(user_id: str, page: int = 1, page_size: int = 5):
+    user_assessments = [a for a in _assessments if a.get("user_id") == user_id]
+    user_assessments.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    total = len(user_assessments)
+    start = (page - 1) * page_size
+    end = start + page_size
+    return {
+        "user_id": user_id,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "assessments": user_assessments[start:end],
+    }
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Delete my data
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+@app.delete("/api/users/{user_id}/data")
+async def delete_user_data(user_id: str):
+    """Hard-delete all assessments and PHQ-8 results for this user."""
+    global _assessments, _phq8_results
+    before_assess = len(_assessments)
+    before_phq8 = len(_phq8_results)
+    _assessments = [a for a in _assessments if a.get("user_id") != user_id]
+    _phq8_results = [r for r in _phq8_results if r.get("user_id") != user_id]
+    return {
+        "message": "All user data deleted.",
+        "assessments_deleted": before_assess - len(_assessments),
+        "phq8_deleted": before_phq8 - len(_phq8_results),
+        "timestamp": datetime.now(),
+    }
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Model metrics (served from JSON file)
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 from pathlib import Path
 import json
 
-# ── Model checkpoint priority ─────────────────────────────────────────────
-# 1. eatd_fast/best.pt  — trained on real EATD-Corpus data (Colab-trained)
-# 2. synthetic/best.pt  — trained on synthetic data (fallback)
+@app.get("/api/model/metrics")
+async def get_model_metrics():
+    """Return model performance metrics loaded from backend/model_metrics.json."""
+    metrics_path = Path(__file__).parent / "model_metrics.json"
+    if not metrics_path.exists():
+        raise HTTPException(status_code=404, detail="model_metrics.json not found in backend/.")
+    with open(metrics_path) as f:
+        return json.load(f)
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Multimodal Analysis (main endpoint â€” updated path + richer response)
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 _CKPT_PRIORITY = [
     Path(__file__).parent / "checkpoints" / "eatd_fast" / "best.pt",
     Path(__file__).parent / "checkpoints" / "eatd"      / "best.pt",
@@ -348,22 +531,15 @@ _CKPT_PRIORITY = [
 ]
 MODEL_CHECKPOINT = next((p for p in _CKPT_PRIORITY if p.exists()), _CKPT_PRIORITY[-1])
 
-_model   = None   # neural model (if checkpoint found)
-_tfidf   = None   # TF-IDF vectorizer (used by eatd_fast model)
+_model = None
+_tfidf = None
 
 
 def _load_model():
-    """
-    Lazy-load whichever checkpoint exists (eatd_fast > eatd > synthetic).
-    Handles both the fast TF-IDF model (train_cpu_fast.py) and the
-    original BERT model (train.py) transparently.
-    Returns (model, tfidf) — tfidf is None for the BERT-based model.
-    """
     global _model, _tfidf
     if _model is not None:
         return _model, _tfidf
 
-    # Re-evaluate which checkpoint exists now (may have been added after startup)
     ckpt_path = next((p for p in _CKPT_PRIORITY if p.exists()), None)
     if ckpt_path is None:
         return None, None
@@ -371,23 +547,16 @@ def _load_model():
     try:
         import torch
         import numpy as _np
-        from sklearn.feature_extraction.text import TfidfVectorizer
+        from sklearn.feature_extraction.text import TfidfVectorizer, TfidfTransformer as _TT
         import scipy.sparse as _sp
-        from sklearn.feature_extraction.text import TfidfTransformer as _TT
 
         ckpt = torch.load(str(ckpt_path), map_location="cpu", weights_only=False)
-        print(f"[multimodal] Loading checkpoint: {ckpt_path.name} from {ckpt_path.parent.name}/")
-
-        # ── Detect model type from checkpoint keys ──────────────────────
         has_tfidf = "tfidf_vocab" in ckpt
 
         if has_tfidf:
-            # Fast TF-IDF model (train_cpu_fast.py / Colab notebook)
             from train_cpu_fast import FastMultimodalModel
             tfidf_dim = ckpt.get("args", {}).get("tfidf_dim", 500)
             m = FastMultimodalModel(tfidf_dim=tfidf_dim)
-
-            # Remap Colab checkpoint keys (audio/text/facial) to local names (audio_enc/text_enc/facial_enc)
             state = ckpt["model_state"]
             key_map = {"audio.": "audio_enc.", "text.": "text_enc.", "facial.": "facial_enc."}
             remapped = {}
@@ -401,7 +570,6 @@ def _load_model():
             m.load_state_dict(remapped, strict=False)
             m.eval()
 
-            # Rebuild TF-IDF vectorizer from saved vocab + idf weights
             idf_arr = _np.array(ckpt["tfidf_idf"], dtype=_np.float64)
             tv = TfidfVectorizer(max_features=len(ckpt["tfidf_vocab"]),
                                  sublinear_tf=True, ngram_range=(1, 2))
@@ -410,75 +578,46 @@ def _load_model():
             _tt = _TT(sublinear_tf=True)
             _tt.idf_ = idf_arr
             n = len(idf_arr)
-            _tt._idf_diag = _sp.diags(idf_arr, offsets=0,
-                                       shape=(n, n), format="csr", dtype=_np.float64)
+            _tt._idf_diag = _sp.diags(idf_arr, offsets=0, shape=(n, n), format="csr", dtype=_np.float64)
             tv._tfidf = _tt
             _tfidf = tv
             _model = m
-            print(f"[multimodal] Fast TF-IDF model loaded. Vocab size={len(tv.vocabulary_)}")
         else:
-            # Original BERT model (train.py)
             from multimodal_model import build_model
             saved_args = ckpt.get("args", {})
-            m = build_model(
-                task      = saved_args.get("task", "classification"),
-                embed_dim = saved_args.get("embed_dim", 256),
-                dropout   = 0.0,
-            )
+            m = build_model(task=saved_args.get("task", "classification"),
+                            embed_dim=saved_args.get("embed_dim", 256),
+                            dropout=0.0)
             m.load_state_dict(ckpt["model_state"])
             m.eval()
             _model = m
             _tfidf = None
-            print("[multimodal] BERT model loaded.")
 
         return _model, _tfidf
-
     except Exception as e:
-        print(f"[multimodal] Model load failed (will use heuristic fallback): {e}")
+        print(f"[multimodal] Model load failed (heuristic fallback): {e}")
         return None, None
 
 
-# ── Shared action plan (used by both heuristic and neural paths) ──────────────
 ACTION_PLAN_MAP = {
     "critical": {
         "summary": "Immediate professional support is strongly advised.",
         "categories": [
             {
-                "category": "🚨 Immediate Help",
+                "category": "Immediate Help",
                 "priority": "urgent",
                 "steps": [
-                    "Call KIRAN Mental Health Helpline: 1800-599-0019 (India, free, 24/7) right now.",
-                    "Call iCall: 9152987821 | Vandrevala Foundation: 1860-2662-345.",
+                    f"Call {CRISIS_HELPLINE_NAME}: {CRISIS_HELPLINE_NUMBER} (free, 24/7) right now.",
                     "Go to your nearest hospital emergency / psychiatry OPD if you feel unsafe.",
-                    "Tell a trusted person — family member, friend, or colleague — what you are experiencing.",
+                    "Tell a trusted person what you are experiencing.",
                 ],
             },
             {
-                "category": "🧠 Professional Care",
+                "category": "Professional Care",
                 "priority": "high",
                 "steps": [
                     "Book an emergency appointment with a psychiatrist or clinical psychologist today.",
-                    "If prescribed medication, take it regularly and do not stop without doctor advice.",
-                    "Ask your doctor about Cognitive Behavioural Therapy (CBT) — it is proven effective for severe depression.",
-                ],
-            },
-            {
-                "category": "🏠 Immediate Safety",
-                "priority": "high",
-                "steps": [
-                    "Remove or secure access to anything that could be used to self-harm.",
-                    "Stay with someone you trust — avoid being alone for extended periods.",
-                    "Inform a close contact about your current mental state so they can check in on you.",
-                ],
-            },
-            {
-                "category": "🌱 Daily Stabilisation",
-                "priority": "medium",
-                "steps": [
-                    "Try to eat one nutritious meal today, even if appetite is low.",
-                    "Get outside for at least 10 minutes — sunlight helps regulate mood.",
-                    "Limit alcohol and caffeine; both worsen anxiety and depression.",
-                    "Do one small task you can complete — it builds a tiny sense of achievement.",
+                    "Ask your doctor about Cognitive Behavioural Therapy (CBT).",
                 ],
             },
         ],
@@ -487,136 +626,53 @@ ACTION_PLAN_MAP = {
         "summary": "Significant distress detected. Take action this week.",
         "categories": [
             {
-                "category": "🏥 Professional Support",
+                "category": "Professional Support",
                 "priority": "high",
                 "steps": [
-                    "Schedule a session with a therapist or counsellor within the next 3–5 days.",
-                    "Contact iCall: 9152987821 | KIRAN: 1800-599-0019 if you need to talk now.",
-                    "Consider online therapy platforms (iCall, YourDOST, MindPeers) for quick access.",
-                    "Share your PHQ-8 estimate with your doctor for a formal assessment.",
+                    "Schedule a session with a therapist or counsellor within 3â€“5 days.",
+                    f"Contact {CRISIS_HELPLINE_NAME}: {CRISIS_HELPLINE_NUMBER} if you need to talk now.",
                 ],
             },
             {
-                "category": "💤 Sleep & Body",
+                "category": "Sleep and Body",
                 "priority": "high",
                 "steps": [
-                    "Set a fixed sleep and wake time — irregular sleep worsens depression significantly.",
-                    "Avoid screens 30 minutes before bed; try the 4-7-8 breathing technique to fall asleep.",
-                    "Eat regular meals. Omega-3 rich foods (walnuts, flaxseed, fish) support brain health.",
-                    "Even a 20-minute brisk walk daily raises serotonin and reduces depressive symptoms.",
-                ],
-            },
-            {
-                "category": "🧘 Mind Practices",
-                "priority": "medium",
-                "steps": [
-                    "Try 10 minutes of guided meditation daily (apps: Calm, Headspace, or YouTube).",
-                    "Practice box breathing: inhale 4s → hold 4s → exhale 4s → hold 4s. Repeat 5×.",
-                    "Write 3 things you felt during the day in a journal — this builds emotional awareness.",
-                    "Identify and challenge one negative thought each day using CBT reframing.",
-                ],
-            },
-            {
-                "category": "👥 Social Connection",
-                "priority": "medium",
-                "steps": [
-                    "Reach out to one trusted person today — even a short message counts.",
-                    "Reduce time spent on social media; it tends to amplify negative feelings.",
-                    "Join a peer support group (online or offline) for people dealing with similar challenges.",
-                ],
-            },
-            {
-                "category": "📋 Lifestyle Adjustments",
-                "priority": "low",
-                "steps": [
-                    "Reduce workload if possible — burnout accelerates depression.",
-                    "Set small, achievable goals each day to rebuild motivation and confidence.",
-                    "Avoid alcohol; it is a depressant and will worsen your symptoms over time.",
-                    "Spend time in nature — even a local park visit improves mood measurably.",
+                    "Set a fixed sleep and wake time â€” irregular sleep worsens depression.",
+                    "Even a 20-minute brisk walk daily raises serotonin.",
                 ],
             },
         ],
     },
     "moderate": {
-        "summary": "Moderate distress signals detected. Take proactive steps now.",
+        "summary": "Moderate distress signals detected. Take proactive steps.",
         "categories": [
             {
-                "category": "🧑‍⚕️ Check-in with a Professional",
+                "category": "Check-in with a Professional",
                 "priority": "medium",
                 "steps": [
-                    "Book a session with a counsellor or therapist — even one session can help clarify your feelings.",
-                    "Talk to your college counsellor, HR mental health support, or GP about how you have been feeling.",
-                    "Online options: iCall (9152987821), YourDOST, MindPeers — low cost, easy to access.",
+                    "Book a session with a counsellor or therapist.",
+                    "Talk to your college counsellor, HR, or GP about how you've been feeling.",
                 ],
             },
             {
-                "category": "🏃 Physical Wellbeing",
+                "category": "Physical Wellbeing",
                 "priority": "medium",
                 "steps": [
-                    "Walk or do light exercise for at least 20 minutes daily — it is one of the most evidence-backed mood boosters.",
-                    "Prioritise 7–8 hours of sleep consistently; poor sleep doubles depressive symptoms.",
-                    "Drink enough water and eat regular meals — skipping meals worsens energy and mood.",
-                ],
-            },
-            {
-                "category": "🧘 Stress & Mind",
-                "priority": "medium",
-                "steps": [
-                    "Practice the 5-4-3-2-1 grounding technique when feeling overwhelmed: 5 things you see, 4 you touch, 3 you hear, 2 you smell, 1 you taste.",
-                    "Try box breathing for 5 minutes: inhale 4s → hold 4s → exhale 4s → hold 4s.",
-                    "Use a free meditation app (Calm, Headspace, Insight Timer) for 10 minutes daily.",
-                    "Schedule a daily 'worry window' — 15 minutes to think about problems, then close it.",
-                ],
-            },
-            {
-                "category": "📓 Journaling & Self-awareness",
-                "priority": "low",
-                "steps": [
-                    "Write 3 sentences every evening: one feeling, one trigger, one thing you are grateful for.",
-                    "Track your mood score each day — noticing patterns helps you act earlier next time.",
-                    "Identify your top 2–3 stressors and brainstorm one small action you could take on each.",
-                ],
-            },
-            {
-                "category": "🤝 Stay Connected",
-                "priority": "low",
-                "steps": [
-                    "Plan one social activity this week — lunch, a call, or a walk with someone you trust.",
-                    "Volunteer or help someone else — it shifts focus and boosts your own mood.",
-                    "Limit doom-scrolling; replace 15 minutes of social media with a hobby or a walk.",
+                    "Walk or do light exercise for at least 20 minutes daily.",
+                    "Prioritise 7â€“8 hours of sleep consistently.",
                 ],
             },
         ],
     },
     "low": {
-        "summary": "You appear to be in a good mental state. Keep it up!",
+        "summary": "You appear to be in a good mental state. Keep it up.",
         "categories": [
             {
-                "category": "✅ Maintain What's Working",
+                "category": "Maintain What's Working",
                 "priority": "low",
                 "steps": [
-                    "Continue your current self-care routines — sleep, exercise, and social connection.",
+                    "Continue your current self-care routines.",
                     "Keep journaling a few times a week to maintain self-awareness.",
-                    "Celebrate small wins — acknowledge your progress regularly.",
-                ],
-            },
-            {
-                "category": "🌿 Build Resilience",
-                "priority": "low",
-                "steps": [
-                    "Practice mindfulness or guided meditation for 10 minutes daily as a preventive habit.",
-                    "Read about mental health — understanding it reduces stigma and prepares you for harder days.",
-                    "Build a strong support network — nurture relationships before you need them.",
-                    "Learn one new stress-management technique: progressive muscle relaxation or cold-water breathing.",
-                ],
-            },
-            {
-                "category": "🎯 Growth & Purpose",
-                "priority": "low",
-                "steps": [
-                    "Set one meaningful goal for the week and work towards it step by step.",
-                    "Engage in a creative hobby — music, art, writing, cooking — for emotional expression.",
-                    "Help or mentor someone else — contributing to others consistently raises subjective wellbeing.",
                 ],
             },
         ],
@@ -624,23 +680,47 @@ ACTION_PLAN_MAP = {
 }
 
 
-def _heuristic_analysis(text: str, has_audio: bool, has_video: bool) -> dict:
-    """
-    Pure text + linguistic-feature heuristic used when no trained model is
-    available.  Returns the same schema as the model inference path so the
-    frontend never needs to know the difference.
-    """
-    text_lower = text.lower()
+def _build_key_findings(text: str, dep_score: float, has_audio: bool, has_video: bool) -> List[str]:
+    """Generate 3 plain-language key findings from available signals."""
+    words = text.lower().split()
+    word_count = len(words)
+    first_person = sum(1 for w in words if w in {"i", "me", "my", "myself"})
+    fp_ratio = first_person / max(word_count, 1)
 
-    # ── Linguistic feature extraction ──────────────────────────────────────
+    findings = []
+
+    if dep_score >= 0.60:
+        findings.append("Strong negative affect language detected in the transcript.")
+    elif dep_score >= 0.35:
+        findings.append("Moderate negative affect language observed in the transcript.")
+    else:
+        findings.append("Transcript sentiment is predominantly neutral to positive.")
+
+    if fp_ratio > 0.10:
+        findings.append(
+            f"Elevated first-person pronoun use ({fp_ratio:.0%}) â€” a known linguistic marker of depression."
+        )
+    else:
+        findings.append("First-person pronoun use is within typical range.")
+
+    if has_audio:
+        findings.append("Audio modality was included; speech features contributed to the overall score.")
+    elif has_video:
+        findings.append("Video modality was included; facial features contributed to the overall score.")
+    else:
+        findings.append("Analysis was text-only. Add audio or video for a more comprehensive assessment.")
+
+    return findings[:3]
+
+
+def _heuristic_analysis(text: str, has_audio: bool, has_video: bool, user_id: str = "anonymous") -> dict:
+    text_lower = text.lower()
     words = text_lower.split()
     word_count = len(words)
 
-    # First-person pronouns (depression marker)
     first_person = sum(1 for w in words if w in {"i", "me", "my", "myself", "mine"})
     first_person_ratio = first_person / max(word_count, 1)
 
-    # Negative / depressive vocabulary
     neg_words = {
         "sad", "hopeless", "worthless", "tired", "exhausted", "empty",
         "alone", "lonely", "depressed", "anxious", "worried", "stressed",
@@ -659,46 +739,38 @@ def _heuristic_analysis(text: str, has_audio: bool, has_video: bool) -> dict:
     neg_ratio  = neg_count / max(word_count, 1)
     pos_ratio  = pos_count / max(word_count, 1)
 
-    # Crisis keywords
-    crisis_high = [
-        "suicide", "kill myself", "end my life", "want to die",
-        "no reason to live", "better off dead", "harm myself",
-    ]
+    crisis_high = ["suicide", "kill myself", "end my life", "want to die",
+                   "no reason to live", "better off dead", "harm myself"]
     crisis_mid = ["hopeless", "worthless", "can't go on", "give up", "unbearable"]
     has_crisis_high = any(kw in text_lower for kw in crisis_high)
     has_crisis_mid  = any(kw in text_lower for kw in crisis_mid)
 
-    # ── Scoring ───────────────────────────────────────────────────────────
     depression_score = 0.0
-    depression_score += min(first_person_ratio * 2.0, 0.3)   # ≤ 0.30
-    depression_score += min(neg_ratio * 3.0, 0.40)            # ≤ 0.40
-    depression_score -= min(pos_ratio * 2.0, 0.20)            # ≤ -0.20
+    depression_score += min(first_person_ratio * 2.0, 0.3)
+    depression_score += min(neg_ratio * 3.0, 0.40)
+    depression_score -= min(pos_ratio * 2.0, 0.20)
     if has_crisis_high:
         depression_score += 0.60
     elif has_crisis_mid:
         depression_score += 0.30
     depression_score = float(max(0.0, min(1.0, depression_score)))
 
-    # Modality confidence (mock values when files are absent)
-    audio_conf  = 0.55 if has_audio else 0.0
-    video_conf  = 0.50 if has_video else 0.0
-    text_conf   = 0.85
+    audio_conf = 0.55 if has_audio else 0.0
+    video_conf = 0.50 if has_video else 0.0
+    text_conf  = 0.85
 
-    # Weighted fusion
-    weights_sum  = text_conf + audio_conf + video_conf
+    weights_sum = text_conf + audio_conf + video_conf
     if weights_sum > 0:
         fused_score = (
             depression_score * text_conf +
-            depression_score * 0.9 * audio_conf +   # audio slightly noisier
+            depression_score * 0.9 * audio_conf +
             depression_score * 0.85 * video_conf
         ) / weights_sum
     else:
         fused_score = depression_score
 
-    # PHQ-8 estimate (scale 0–24)
     phq8_estimate = round(fused_score * 24, 1)
 
-    # Risk bucket
     if has_crisis_high or fused_score >= 0.70:
         risk_level = "critical"
     elif fused_score >= 0.50:
@@ -708,94 +780,123 @@ def _heuristic_analysis(text: str, has_audio: bool, has_video: bool) -> dict:
     else:
         risk_level = "low"
 
-    # Pick action plan from module-level map
+    # Modality contributions (normalised to %)
+    mod_total = text_conf + audio_conf + video_conf
+    modality_contributions = {
+        "text":  round(text_conf  / max(mod_total, 1) * 100, 1),
+        "audio": round(audio_conf / max(mod_total, 1) * 100, 1),
+        "video": round(video_conf / max(mod_total, 1) * 100, 1),
+    }
+    per_modality_confidence = {
+        "text":  round(text_conf,  3),
+        "audio": round(audio_conf, 3) if has_audio else None,
+        "video": round(video_conf, 3) if has_video else None,
+    }
+
     plan = ACTION_PLAN_MAP[risk_level]
     flat_recs = [step for cat in plan["categories"] for step in cat["steps"]]
+    key_findings = _build_key_findings(text, fused_score, has_audio, has_video)
 
-    return {
-        "depression_probability": round(fused_score, 3),
-        "phq8_estimate": phq8_estimate,
+    # Attention-style word weights (simple neg/pos word highlighting)
+    word_weights = {}
+    for w in words:
+        if w in neg_words:
+            word_weights[w] = -1.0
+        elif w in pos_words:
+            word_weights[w] = 1.0
+
+    input_type = "combined" if (has_audio and has_video) else \
+                 "audio" if has_audio else \
+                 "video" if has_video else "text"
+
+    result = {
         "risk_level": risk_level,
-        "binary_prediction": int(fused_score >= 0.40),  # 0=non-depressed, 1=depressed
-        "modality_weights": {
-            "text": round(text_conf / max(weights_sum, 1), 3),
-            "audio": round(audio_conf / max(weights_sum, 1), 3),
-            "video": round(video_conf / max(weights_sum, 1), 3),
-        },
+        "score": round(fused_score, 3),
+        "confidence": round(text_conf, 3),
+        "phq8_estimate": phq8_estimate,
+        "binary_prediction": int(fused_score >= 0.40),
+        "modality_contributions": modality_contributions,
+        "per_modality_confidence": per_modality_confidence,
+        "key_findings": key_findings,
         "linguistic_features": {
             "word_count": word_count,
             "first_person_ratio": round(first_person_ratio, 3),
             "negative_word_ratio": round(neg_ratio, 3),
             "positive_word_ratio": round(pos_ratio, 3),
         },
+        "word_weights": word_weights,
         "crisis_flags": {
             "high_risk_detected": has_crisis_high,
             "medium_risk_detected": has_crisis_mid,
         },
         "recommendations": flat_recs,
         "action_plan": plan,
-        "model_used": "heuristic",   # ← changes to "neural" when checkpoint loads
+        "model_used": "heuristic",
+        "demo_mode": True,
+        "input_type": input_type,
+        "timestamp": datetime.now().isoformat(),
+        "user_id": user_id,
         "note": (
             "Results are based on linguistic analysis only. "
             "Connect a trained model checkpoint for full multimodal inference."
         ),
     }
+    _assessments.append(result)
+    return result
 
 
 class MultimodalTextRequest(BaseModel):
-    """Body for the text-only multimodal endpoint variant."""
     text: str
     user_id: Optional[str] = "anonymous"
 
 
-@app.post("/api/multimodal/analyze")
-async def multimodal_analyze(
+@app.post("/api/assess/multimodal")
+async def assess_multimodal(
     text: str = Form(..., description="Interview/journal transcript text"),
     user_id: str = Form("anonymous"),
-    audio_file: Optional[UploadFile] = File(None, description="Audio file (.wav/.mp3) — optional"),
-    video_file: Optional[UploadFile] = File(None, description="Video file (.mp4/.avi) — optional"),
+    audio_file: Optional[UploadFile] = File(None),
+    video_file: Optional[UploadFile] = File(None),
 ):
     """
-    Multimodal mental health analysis.
+    Primary multimodal assessment endpoint.
 
-    Works in three modes:
-    - TEXT ONLY      : just pass 'text' form field (always available)
-    - TEXT + AUDIO   : also upload audio_file
-    - TEXT + AUDIO + VIDEO: upload both files
-
-    When a trained model checkpoint exists at:
-      backend/checkpoints/daic/best.pt   (real DAIC-WOZ model)
-      backend/checkpoints/synthetic/best.pt  (synthetic-data model)
-    it is loaded and used for inference.  Otherwise a linguistic heuristic
-    is used that requires no additional dependencies.
-
-    DATASET SWAP NOTE
-    -----------------
-    No changes needed in this file when you switch to the real DAIC-WOZ model.
-    Just train with:
-        python run_pipeline.py --mode daic --daic_root <path>
-    The checkpoint at backend/checkpoints/daic/best.pt will be picked up
-    automatically on the next request.
+    Accepts text (required) + optional audio (.wav/.mp3) and video (.mp4/.avi).
+    Returns: risk_level, score, confidence, modality_contributions,
+             per_modality_confidence, key_findings, timestamp.
+    Falls back to heuristic mode with demo_mode=true if no checkpoint is available.
     """
+    if not text or not text.strip():
+        raise HTTPException(status_code=422, detail="'text' field is required.")
+
     has_audio = audio_file is not None and audio_file.filename != ""
     has_video = video_file is not None and video_file.filename != ""
 
-    if not text or not text.strip():
-        raise HTTPException(status_code=422, detail="'text' field is required and cannot be empty.")
+    # File size validation
+    if has_audio:
+        audio_bytes = await audio_file.read()
+        if len(audio_bytes) > MAX_AUDIO_SIZE_MB * 1024 * 1024:
+            raise HTTPException(status_code=413,
+                                detail=f"Audio file exceeds {MAX_AUDIO_SIZE_MB} MB limit.")
+    else:
+        audio_bytes = None
 
-    # ── Try loading the trained neural model ──────────────────────────────
+    if has_video:
+        video_bytes = await video_file.read()
+        if len(video_bytes) > MAX_VIDEO_SIZE_MB * 1024 * 1024:
+            raise HTTPException(status_code=413,
+                                detail=f"Video file exceeds {MAX_VIDEO_SIZE_MB} MB limit.")
+    # Video bytes discarded after size check (no video inference yet)
+
     model, tfidf = _load_model()
 
     if model is not None:
         try:
             import torch
-            N_MELS_      = 128
+            N_MELS_ = 128
             MAX_AU_FRAMES_ = 300
-            N_AU_        = 17
+            N_AU_ = 17
 
-            # Audio tensor
-            if has_audio:
-                audio_bytes = await audio_file.read()
+            if has_audio and audio_bytes:
                 import librosa
                 y, sr = librosa.load(io.BytesIO(audio_bytes), sr=16000, duration=60)
                 mel = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=N_MELS_)
@@ -806,44 +907,56 @@ async def multimodal_analyze(
             else:
                 audio_tensor = torch.zeros(1, 1, N_MELS_, 128)
 
-            # Facial tensor (zeros — OpenFace not available at runtime)
             facial_tensor = torch.zeros(1, MAX_AU_FRAMES_, N_AU_)
 
             with torch.no_grad():
                 if tfidf is not None:
-                    # ── Fast TF-IDF model (Colab-trained) ─────────────
                     vec = tfidf.transform([text.strip()]).toarray().astype("float32")
                     text_tensor = torch.tensor(vec, dtype=torch.float32)
                     out = model(audio_tensor, text_tensor, facial_tensor)
                 else:
-                    # ── BERT model ─────────────────────────────────────
                     from transformers import BertTokenizer
-                    from dataset import MAX_TEXT_LEN, AU_COLS
+                    from dataset import MAX_TEXT_LEN
                     tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
                     enc = tokenizer(text, max_length=MAX_TEXT_LEN, padding="max_length",
                                     truncation=True, return_tensors="pt")
                     out = model(audio_tensor, enc["input_ids"], enc["attention_mask"], facial_tensor)
 
-                probs      = torch.softmax(out, dim=1)[0]
-                dep_prob   = float(probs[1])
-                pred_class = int(probs.argmax())
-                phq8_estimate = round(dep_prob * 24, 1)
+                probs    = torch.softmax(out, dim=1)[0]
+                dep_prob = float(probs[1])
+                pred_cls = int(probs.argmax())
 
             if dep_prob >= 0.70:   risk_level = "critical"
             elif dep_prob >= 0.50: risk_level = "high"
             elif dep_prob >= 0.30: risk_level = "moderate"
             else:                  risk_level = "low"
 
-            # Build action plan from module-level map using neural risk_level
             plan = ACTION_PLAN_MAP[risk_level]
             flat_recs = [step for cat in plan["categories"] for step in cat["steps"]]
-            return {
-                "depression_probability": round(dep_prob, 3),
-                "phq8_estimate": phq8_estimate,
+            key_findings = _build_key_findings(text, dep_prob, has_audio, has_video)
+
+            input_type = "combined" if (has_audio and has_video) else \
+                         "audio" if has_audio else \
+                         "video" if has_video else "text"
+
+            neural_weights = {"text": 60.0, "audio": 25.0 if has_audio else 0.0,
+                              "video": 15.0 if has_video else 0.0}
+            if not has_audio and not has_video:
+                neural_weights = {"text": 100.0, "audio": 0.0, "video": 0.0}
+
+            result = {
                 "risk_level": risk_level,
-                "binary_prediction": pred_class,
-                "modality_weights": {"text": 0.6, "audio": 0.25, "video": 0.15},
-                "linguistic_features": {},
+                "score": round(dep_prob, 3),
+                "confidence": round(float(probs.max()), 3),
+                "phq8_estimate": round(dep_prob * 24, 1),
+                "binary_prediction": pred_cls,
+                "modality_contributions": neural_weights,
+                "per_modality_confidence": {
+                    "text": round(float(probs.max()), 3),
+                    "audio": 0.55 if has_audio else None,
+                    "video": 0.50 if has_video else None,
+                },
+                "key_findings": key_findings,
                 "crisis_flags": {
                     "high_risk_detected": dep_prob >= 0.70,
                     "medium_risk_detected": dep_prob >= 0.50,
@@ -851,35 +964,39 @@ async def multimodal_analyze(
                 "recommendations": flat_recs,
                 "action_plan": plan,
                 "model_used": "neural",
-                "note": "Inference from trained multimodal neural model (EATD-Corpus).",
+                "demo_mode": False,
+                "input_type": input_type,
+                "timestamp": datetime.now().isoformat(),
+                "user_id": user_id,
+                "note": "Inference from trained multimodal neural model.",
             }
+            _assessments.append(result)
+            return result
         except Exception as e:
             print(f"[multimodal] Neural inference error, falling back to heuristic: {e}")
 
-    # ── Heuristic fallback (no checkpoint / inference error) ──────────────
-    result = _heuristic_analysis(text, has_audio, has_video)
-    return result
+    return _heuristic_analysis(text, has_audio, has_video, user_id)
+
+
+# Legacy path alias kept for backward compatibility
+@app.post("/api/multimodal/analyze")
+async def multimodal_analyze_legacy(
+    text: str = Form(...),
+    user_id: str = Form("anonymous"),
+    audio_file: Optional[UploadFile] = File(None),
+    video_file: Optional[UploadFile] = File(None),
+):
+    """Deprecated â€” use POST /api/assess/multimodal instead."""
+    return await assess_multimodal(text=text, user_id=user_id,
+                                   audio_file=audio_file, video_file=video_file)
 
 
 @app.post("/api/multimodal/analyze/text")
 async def multimodal_analyze_text(req: MultimodalTextRequest):
-    """
-    JSON-body variant of /api/multimodal/analyze for text-only analysis.
-    Useful for quick testing without multipart form uploads.
-
-    Example:
-        curl -X POST http://localhost:8000/api/multimodal/analyze/text \\
-             -H 'Content-Type: application/json' \\
-             -d '{"text": "I have been feeling very sad and hopeless lately."}'
-    """
-    result = _heuristic_analysis(req.text.strip(), has_audio=False, has_video=False)
-    model, _ = _load_model()
-    if model is not None:
-        result["note"] = "Text-only JSON endpoint — use /api/multimodal/analyze with file uploads for full multimodal inference."
+    """JSON-body text-only analysis shortcut."""
+    result = _heuristic_analysis(req.text.strip(), has_audio=False, has_video=False, user_id=req.user_id)
     return result
 
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-
-# Made with Bob

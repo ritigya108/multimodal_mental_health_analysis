@@ -144,7 +144,7 @@ function Journal() {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 700 }}>
-          My Journal 📝
+          My Journal ðŸ“
         </Typography>
         <Button
           variant="contained"
@@ -162,7 +162,7 @@ function Journal() {
           <Card sx={{ position: 'sticky', top: 20 }}>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                ✍️ Journaling Tips
+                âœï¸ Journaling Tips
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Box>
@@ -204,7 +204,7 @@ function Journal() {
           <Card sx={{ mt: 2, backgroundColor: 'primary.light' }}>
             <CardContent>
               <Typography variant="subtitle2" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
-                🤖 AI Analysis
+                ðŸ¤– AI Analysis
               </Typography>
               <Typography variant="body2" sx={{ color: 'white', mb: 2 }}>
                 Our AI analyzes your entries to provide insights and support.
@@ -242,7 +242,7 @@ function Journal() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         {getSentimentIcon(entry.sentiment)}
                         <Typography variant="caption" color="text.secondary">
-                          {format(new Date(entry.timestamp), 'MMMM dd, yyyy • h:mm a')}
+                          {format(new Date(entry.timestamp), 'MMMM dd, yyyy â€¢ h:mm a')}
                         </Typography>
                       </Box>
                       <Chip
@@ -320,7 +320,7 @@ function Journal() {
                   Entry Analyzed Successfully!
                 </Typography>
                 <Typography variant="body2">
-                  Sentiment: {analysis.sentiment} • Confidence: {(analysis.confidence * 100).toFixed(0)}%
+                  Sentiment: {analysis.sentiment} â€¢ Confidence: {(analysis.confidence * 100).toFixed(0)}%
                 </Typography>
               </Alert>
             )}
@@ -344,5 +344,3 @@ function Journal() {
 }
 
 export default Journal;
-
-// Made with Bob

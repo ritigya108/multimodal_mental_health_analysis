@@ -219,7 +219,7 @@ class MentalHealthAnalyzer:
         
         if risk_level == 'critical':
             recommendations.extend([
-                "⚠️ URGENT: Please contact a mental health professional immediately",
+                "âš ï¸ URGENT: Please contact a mental health professional immediately",
                 "Call National Suicide Prevention Lifeline: 988 (US) or your local emergency number",
                 "Reach out to a trusted friend or family member right now",
                 "Go to the nearest emergency room if you're in immediate danger"
@@ -252,5 +252,3 @@ class MentalHealthAnalyzer:
 
 # Initialize global analyzer instance
 analyzer = MentalHealthAnalyzer()
-
-# Made with Bob

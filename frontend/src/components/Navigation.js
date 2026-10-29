@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Drawer,
@@ -11,72 +11,90 @@ import {
   Typography,
   Box,
   Divider,
+  IconButton,
+  Tooltip,
+  Avatar,
+  Menu,
+  MenuItem,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
-  Mood as MoodIcon,
   Book as BookIcon,
   Chat as ChatIcon,
-  Psychology as PsychologyIcon,
-  LocalLibrary as ResourcesIcon,
+  Psychology as AssessIcon,
   Person as PersonIcon,
-  Favorite as HeartIcon,
+  Assessment as MetricsIcon,
+  Quiz as PHQ8Icon,
+  Settings as SettingsIcon,
+  ChevronLeft as CollapseIcon,
+  ChevronRight as ExpandIcon,
+  FavoriteBorder as LogoIcon,
+  Logout as LogoutIcon,
 } from '@mui/icons-material';
 
-const drawerWidth = 260;
+const DRAWER_WIDTH_FULL = 240;
+const DRAWER_WIDTH_MINI = 64;
 
-const menuItems = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-  { text: 'Mood Tracker', icon: <MoodIcon />, path: '/mood' },
-  { text: 'Journal', icon: <BookIcon />, path: '/journal' },
-  { text: 'AI Chat', icon: <ChatIcon />, path: '/chat' },
-  { text: 'Multimodal Analysis', icon: <PsychologyIcon />, path: '/multimodal' },
-  { text: 'Resources', icon: <ResourcesIcon />, path: '/resources' },
-  { text: 'Profile', icon: <PersonIcon />, path: '/profile' },
+const NAV_ITEMS = [
+  { text: 'Overview',    icon: <DashboardIcon />, path: '/dashboard', group: 'main' },
+  { text: 'Assessment',  icon: <AssessIcon />,    path: '/assess',    group: 'main' },
+  { text: 'PHQ-8',       icon: <PHQ8Icon />,      path: '/phq8',      group: 'main' },
+  { text: 'Journal',     icon: <BookIcon />,      path: '/journal',   group: 'tools' },
+  { text: 'AI Chat',     icon: <ChatIcon />,      path: '/chat',      group: 'tools' },
+  { text: 'Model Performance', icon: <MetricsIcon />, path: '/model', group: 'tools' },
+  { text: 'Profile',     icon: <PersonIcon />,    path: '/profile',   group: 'account' },
+  { text: 'Settings',    icon: <SettingsIcon />,  path: '/settings',  group: 'account' },
 ];
 
 function Navigation() {
   const navigate = useNavigate();
   const location = useLocation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width: drawerWidth,
-        flexShrink: 0,
-        '& .MuiDrawer-paper': {
-          width: drawerWidth,
-          boxSizing: 'border-box',
-          backgroundColor: 'background.paper',
-          borderRight: '1px solid',
-          borderColor: 'divider',
-        },
-      }}
-    >
-      <Toolbar>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <HeartIcon sx={{ color: 'primary.main', fontSize: 32 }} />
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-              MindCare
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              AI Mental Health
-            </Typography>
-          </Box>
-        </Box>
-      </Toolbar>
-      <Divider />
-      <List sx={{ px: 1, py: 2 }}>
-        {menuItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          return (
-            <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
+  const [collapsed, setCollapsed] = useState(false);
+  const [anchorEl, setAnchorEl] = useState(null);
+
+  const drawerWidth = collapsed ? DRAWER_WIDTH_MINI : DRAWER_WIDTH_FULL;
+  const userName = localStorage.getItem('mindcare_user_name') || 'Clinician';
+
+  const handleUserMenuOpen = (e) => setAnchorEl(e.currentTarget);
+  const handleUserMenuClose = () => setAnchorEl(null);
+  const handleSignOut = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('mindcare_consent');
+    window.location.href = '/';
+  };
+
+  const renderGroup = (items, label) => (
+    <>
+      {!collapsed && (
+        <Typography
+          variant="caption"
+          sx={{ px: 2, pt: 2, pb: 0.5, display: 'block',
+                color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.08em',
+                fontWeight: 600, fontSize: '0.68rem' }}
+        >
+          {label}
+        </Typography>
+      )}
+      {items.map((item) => {
+        const isActive = location.pathname === item.path ||
+                         location.pathname.startsWith(item.path + '/');
+        return (
+          <ListItem key={item.text} disablePadding sx={{ mb: 0.25, px: collapsed ? 0.5 : 1 }}>
+            <Tooltip title={collapsed ? item.text : ''} placement="right">
               <ListItemButton
                 onClick={() => navigate(item.path)}
+                aria-label={item.text}
+                aria-current={isActive ? 'page' : undefined}
                 sx={{
                   borderRadius: 2,
+                  minHeight: 40,
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  px: collapsed ? 1 : 1.5,
                   backgroundColor: isActive ? 'primary.main' : 'transparent',
                   color: isActive ? 'white' : 'text.primary',
                   '&:hover': {
@@ -84,36 +102,139 @@ function Navigation() {
                   },
                   '& .MuiListItemIcon-root': {
                     color: isActive ? 'white' : 'text.secondary',
+                    minWidth: collapsed ? 0 : 36,
                   },
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 40 }}>
+                <ListItemIcon sx={{ justifyContent: 'center' }}>
                   {item.icon}
                 </ListItemIcon>
-                <ListItemText 
-                  primary={item.text}
-                  primaryTypographyProps={{
-                    fontWeight: isActive ? 600 : 400,
-                  }}
-                />
+                {!collapsed && (
+                  <ListItemText
+                    primary={item.text}
+                    primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: isActive ? 600 : 400 }}
+                  />
+                )}
               </ListItemButton>
-            </ListItem>
-          );
-        })}
-      </List>
-      <Box sx={{ flexGrow: 1 }} />
-      <Box sx={{ p: 2, backgroundColor: 'primary.light', m: 2, borderRadius: 2 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'white', mb: 0.5 }}>
-          Need Help?
-        </Typography>
-        <Typography variant="caption" sx={{ color: 'white', opacity: 0.9 }}>
-          Crisis Hotline: 988
-        </Typography>
+            </Tooltip>
+          </ListItem>
+        );
+      })}
+    </>
+  );
+
+  const mainItems    = NAV_ITEMS.filter(i => i.group === 'main');
+  const toolItems    = NAV_ITEMS.filter(i => i.group === 'tools');
+  const accountItems = NAV_ITEMS.filter(i => i.group === 'account');
+
+  return (
+    <Drawer
+      variant={isMobile ? 'temporary' : 'permanent'}
+      sx={{
+        width: drawerWidth,
+        flexShrink: 0,
+        transition: 'width 0.2s ease',
+        '& .MuiDrawer-paper': {
+          width: drawerWidth,
+          boxSizing: 'border-box',
+          backgroundColor: 'background.paper',
+          borderRight: '1px solid',
+          borderColor: 'divider',
+          overflowX: 'hidden',
+          transition: 'width 0.2s ease',
+        },
+      }}
+    >
+      {/* Top bar */}
+      <Toolbar
+        sx={{
+          justifyContent: collapsed ? 'center' : 'space-between',
+          px: collapsed ? 1 : 2,
+          minHeight: '56px !important',
+        }}
+      >
+        {!collapsed && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <LogoIcon sx={{ color: 'primary.main', fontSize: 22 }} />
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'text.primary' }}>
+              MindCare
+            </Typography>
+          </Box>
+        )}
+        <Tooltip title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+          <IconButton
+            onClick={() => setCollapsed(!collapsed)}
+            size="small"
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            sx={{ color: 'text.secondary' }}
+          >
+            {collapsed ? <ExpandIcon fontSize="small" /> : <CollapseIcon fontSize="small" />}
+          </IconButton>
+        </Tooltip>
+      </Toolbar>
+
+      <Divider />
+
+      {/* User row */}
+      <Box
+        sx={{
+          px: collapsed ? 1 : 2,
+          py: 1.5,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          cursor: 'pointer',
+        }}
+        onClick={handleUserMenuOpen}
+        aria-label="User menu"
+      >
+        <Avatar
+          sx={{ width: 32, height: 32, fontSize: '0.875rem',
+                bgcolor: 'primary.main', flexShrink: 0 }}
+        >
+          {userName.charAt(0).toUpperCase()}
+        </Avatar>
+        {!collapsed && (
+          <>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, noWrap: true }}>
+                {userName}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Screening user
+              </Typography>
+            </Box>
+          </>
+        )}
       </Box>
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleUserMenuClose}
+        transformOrigin={{ horizontal: 'left', vertical: 'top' }}
+      >
+        <MenuItem onClick={() => { handleUserMenuClose(); navigate('/profile'); }}>
+          <PersonIcon fontSize="small" sx={{ mr: 1 }} /> Profile
+        </MenuItem>
+        <MenuItem onClick={() => { handleUserMenuClose(); navigate('/settings'); }}>
+          <SettingsIcon fontSize="small" sx={{ mr: 1 }} /> Settings
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={handleSignOut} sx={{ color: 'error.main' }}>
+          <LogoutIcon fontSize="small" sx={{ mr: 1 }} /> Sign out
+        </MenuItem>
+      </Menu>
+
+      <Divider />
+
+      {/* Navigation items */}
+      <List sx={{ py: 1, flex: 1 }} role="navigation" aria-label="Main navigation">
+        {renderGroup(mainItems, 'Screening')}
+        {renderGroup(toolItems, 'Tools')}
+        {renderGroup(accountItems, 'Account')}
+      </List>
     </Drawer>
   );
 }
 
 export default Navigation;
-
-// Made with Bob

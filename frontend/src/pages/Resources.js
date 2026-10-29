@@ -186,7 +186,7 @@ function Resources() {
   return (
     <Box>
       <Typography variant="h4" sx={{ mb: 1, fontWeight: 700 }}>
-        Mental Health Resources 📚
+        Mental Health Resources ðŸ“š
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
         Curated resources to support your mental health journey
@@ -195,7 +195,7 @@ function Resources() {
       {/* Emergency Alert */}
       <Alert severity="error" sx={{ mb: 3 }}>
         <Typography variant="subtitle2" fontWeight={600}>
-          🚨 In Crisis? Get Help Now
+          ðŸš¨ In Crisis? Get Help Now
         </Typography>
         <Typography variant="body2">
           If you're in immediate danger, call 911. For crisis support, call 988 (Suicide & Crisis Lifeline) or text HOME to 741741.
@@ -419,5 +419,3 @@ function Resources() {
 }
 
 export default Resources;
-
-// Made with Bob

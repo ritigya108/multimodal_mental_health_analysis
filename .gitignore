@@ -80,3 +80,5 @@ mental_health.db
 .streamlit/secrets.toml
 
 # Made with Bob
+
+multimodal_mental_health_analysis/

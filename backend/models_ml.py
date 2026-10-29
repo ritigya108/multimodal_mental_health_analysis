@@ -412,6 +412,4 @@ if __name__ == "__main__":
     print(f"\nOutput shape: {output.shape}")
     print(f"Output (first sample): {output[0]}")
     
-    print("\n✅ Models created successfully!")
-
-# Made with Bob for ML Project
+    print("\nâœ… Models created successfully!")

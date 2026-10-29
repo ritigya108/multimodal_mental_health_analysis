@@ -1,214 +1,127 @@
+"""
+Streamlit Home — MindCare overview dashboard (updated).
+Mood Tracker removed; shows assessment history, risk level, and quick links.
+"""
 import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-from datetime import datetime, timedelta
-import json
+import requests
+import os
+from datetime import datetime
 
-# Page configuration
 st.set_page_config(
-    page_title="MindCare - AI Mental Health Monitoring",
+    page_title="MindCare — Overview",
     page_icon="🧠",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# Custom CSS
-st.markdown("""
-    <style>
-    .main {
-        padding: 0rem 1rem;
-    }
-    .stAlert {
-        margin-top: 1rem;
-    }
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin: 0.5rem 0;
-    }
-    </style>
-""", unsafe_allow_html=True)
+BACKEND_URL = (
+    st.secrets.get("BACKEND_URL", None)
+    or os.environ.get("BACKEND_URL", "http://localhost:8000")
+)
 
-# Initialize session state
-if 'user_data' not in st.session_state:
-    st.session_state.user_data = {
-        'name': 'User',
-        'mood_logs': [],
-        'journal_entries': [],
-        'chat_history': [],
-        'current_streak': 7,
-        'total_logs': 45
-    }
+# ── Crisis helpline ────────────────────────────────────────────────────────────
+try:
+    helpline = requests.get(f"{BACKEND_URL}/api/config/helpline", timeout=3).json()
+    HELPLINE_NUMBER = helpline.get("number", "14416")
+    HELPLINE_NAME   = helpline.get("name", "Tele-MANAS")
+except Exception:
+    HELPLINE_NUMBER = "14416"
+    HELPLINE_NAME   = "Tele-MANAS"
 
-# Sidebar
+# ── Session state ──────────────────────────────────────────────────────────────
+if "user_id" not in st.session_state:
+    st.session_state.user_id = "streamlit_user"
+
+# ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("""
-        <div style="text-align: center; padding: 1rem;">
-            <div style="font-size: 5rem;">🧠</div>
-        </div>
-    """, unsafe_allow_html=True)
-    st.title("🧠 MindCare")
-    st.caption("AI Mental Health Monitoring")
-    
+    st.title("MindCare")
+    st.caption("Multimodal Mental Health Analysis")
     st.divider()
-    
-    st.markdown(f"### Welcome, {st.session_state.user_data['name']}! 👋")
-    
-    st.metric("Current Streak", f"{st.session_state.user_data['current_streak']} days 🔥")
-    st.metric("Total Mood Logs", st.session_state.user_data['total_logs'])
-    
-    st.divider()
-    
-    st.error("**🚨 Crisis Support (India)**")
-    st.markdown("**KIRAN: 1800-599-0019**")
-    st.caption("Mental Health Helpline - 24/7")
-    st.markdown("**Vandrevala: 1860-2662-345**")
-    st.caption("Free counseling - 24/7")
+    st.markdown(f"**{HELPLINE_NAME}:** `{HELPLINE_NUMBER}`")
+    st.caption("Free 24/7 crisis support")
 
-# Main content
-st.title("Dashboard 📊")
-st.markdown("### Your Mental Health Overview")
+# ── Main content ───────────────────────────────────────────────────────────────
+st.title("Overview")
+st.caption(datetime.now().strftime("%A, %d %B %Y"))
 
-# Alert for high risk
-if st.session_state.get('risk_level') == 'high':
-    st.error("⚠️ **URGENT**: We're concerned about your well-being. Please contact a mental health professional or call KIRAN: 1800-599-0019 immediately.")
+# Try to load recent assessments from backend
+try:
+    hist = requests.get(
+        f"{BACKEND_URL}/api/assessments/{st.session_state.user_id}",
+        params={"page": 1, "page_size": 5},
+        timeout=5,
+    ).json()
+    assessments = hist.get("assessments", [])
+    total = hist.get("total", 0)
+except Exception:
+    assessments = []
+    total = 0
 
-# Metrics row
+latest = assessments[0] if assessments else None
+
+# ── KPI row ────────────────────────────────────────────────────────────────────
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.markdown("""
-        <div class="metric-card">
-            <h3 style="color: #6366f1;">😊 Mental Health Status</h3>
-            <h2 style="color: #10b981;">Low Risk</h2>
-            <p style="color: #6b7280;">Based on recent activity</p>
-        </div>
-    """, unsafe_allow_html=True)
+    st.metric("Current risk level", latest.get("risk_level", "N/A").title() if latest else "No data")
 
 with col2:
-    st.markdown("""
-        <div class="metric-card">
-            <h3 style="color: #6366f1;">📝 This Week</h3>
-            <p><strong>Journal Entries:</strong> 5</p>
-            <p><strong>Mood Logs:</strong> 7</p>
-            <p><strong>Avg Mood:</strong> 7.2/10</p>
-        </div>
-    """, unsafe_allow_html=True)
+    conf = latest.get("confidence") if latest else None
+    st.metric("Confidence", f"{conf * 100:.0f}%" if conf is not None else "—")
 
 with col3:
-    st.markdown("""
-        <div class="metric-card">
-            <h3 style="color: #6366f1;">🔥 Current Streak</h3>
-            <h2 style="color: #f59e0b;">7 Days</h2>
-            <p style="color: #6b7280;">Keep up the great work!</p>
-        </div>
-    """, unsafe_allow_html=True)
+    st.metric("Assessments completed", total)
 
 with col4:
-    st.markdown("""
-        <div class="metric-card">
-            <h3 style="color: #6366f1;">🏆 Achievements</h3>
-            <p>✅ 7-day streak</p>
-            <p>✅ 45 mood logs</p>
-            <p>✅ 23 journal entries</p>
-        </div>
-    """, unsafe_allow_html=True)
+    if len(assessments) >= 2:
+        prev = assessments[1].get("risk_level", "")
+        cur  = latest.get("risk_level", "") if latest else ""
+        order = {"low": 0, "moderate": 1, "high": 2, "critical": 3}
+        delta = order.get(cur, 0) - order.get(prev, 0)
+        label = "Improved" if delta < 0 else "Worsened" if delta > 0 else "Stable"
+        st.metric("Since last assessment", label)
+    else:
+        st.metric("Since last assessment", "—")
 
 st.divider()
 
-# Mood trend chart
-col1, col2 = st.columns([2, 1])
+# ── Risk level indicator ───────────────────────────────────────────────────────
+if latest:
+    risk = latest.get("risk_level", "unknown")
+    RISK_COLOR = {"low": "green", "moderate": "orange", "high": "red", "critical": "red"}
+    color = RISK_COLOR.get(risk, "gray")
+    st.markdown(f"### Risk level: :{color}[{risk.upper()}]")
 
-with col1:
-    st.subheader("📈 Mood Trend (Last 7 Days)")
-    
-    # Sample data
-    dates = [(datetime.now() - timedelta(days=i)).strftime("%a") for i in range(6, -1, -1)]
-    mood_scores = [6, 7, 6.5, 8, 7.5, 8, 7]
-    
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=dates,
-        y=mood_scores,
-        mode='lines+markers',
-        line=dict(color='#6366f1', width=3),
-        marker=dict(size=10),
-        fill='tozeroy',
-        fillcolor='rgba(99, 102, 241, 0.1)'
-    ))
-    
-    fig.update_layout(
-        xaxis_title="Day",
-        yaxis_title="Mood Score",
-        yaxis=dict(range=[0, 10]),
-        height=300,
-        margin=dict(l=0, r=0, t=0, b=0),
-        hovermode='x unified'
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
+    # Modality bars
+    st.subheader("Modality contribution")
+    contribs = latest.get("modality_contributions", {})
+    for mod in ("Text", "Audio", "Video"):
+        val = contribs.get(mod.lower(), 0)
+        st.progress(int(val), text=f"{mod}: {val:.1f}%")
 
-with col2:
-    st.subheader("💡 Today's Recommendations")
-    
-    st.info("**Morning Walk**\nTake a 20-minute walk in nature")
-    st.success("**Breathing Exercise**\n5-minute guided meditation")
-    st.warning("**Stay Connected**\nReach out to a friend today")
+    # Key findings
+    if latest.get("key_findings"):
+        st.subheader("Key findings")
+        for finding in latest["key_findings"]:
+            st.markdown(f"- {finding}")
+else:
+    st.info("No assessments yet. Use the **Assessment** page to run your first screening.")
 
 st.divider()
 
-# Quick actions
-st.subheader("⚡ Quick Actions")
+# ── Quick navigation ───────────────────────────────────────────────────────────
+st.subheader("Quick actions")
+col_a, col_b, col_c = st.columns(3)
+with col_a:
+    st.page_link("pages/1_Assessment.py", label="Run new assessment", icon="🧠")
+with col_b:
+    st.page_link("pages/2_PHQ8.py", label="PHQ-8 questionnaire", icon="📋")
+with col_c:
+    st.page_link("pages/3_AI_Chat.py", label="AI Chat", icon="💬")
 
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    if st.button("📊 Log Mood", use_container_width=True):
-        st.switch_page("pages/1_Mood_Tracker.py")
-
-with col2:
-    if st.button("📝 Write Journal", use_container_width=True):
-        st.switch_page("pages/2_Journal.py")
-
-with col3:
-    if st.button("💬 Chat with AI", use_container_width=True):
-        st.switch_page("pages/3_AI_Chat.py")
-
-with col4:
-    if st.button("📚 View Resources", use_container_width=True):
-        st.switch_page("pages/4_Resources.py")
-
+# ── Disclaimer + helpline footer ──────────────────────────────────────────────
 st.divider()
-
-# Recent activity
-st.subheader("📋 Recent Activity")
-
-tab1, tab2 = st.tabs(["Mood Logs", "Journal Entries"])
-
-with tab1:
-    # Sample mood logs - using markdown to avoid PyArrow issues
-    st.markdown("""
-    | Date | Mood | Notes |
-    |------|------|-------|
-    | 2024-01-15 | 8/10 | Great day at work! |
-    | 2024-01-14 | 7/10 | Feeling good overall |
-    | 2024-01-13 | 7.5/10 | A bit tired but okay |
-    | 2024-01-12 | 6/10 | Stressful day |
-    | 2024-01-11 | 8/10 | Excellent mood today |
-    """)
-
-with tab2:
-    # Sample journal entries
-    st.markdown("**Today** - *Feeling grateful*")
-    st.caption("Had a productive day and accomplished my goals...")
-    st.divider()
-    st.markdown("**Yesterday** - *Reflection*")
-    st.caption("Thinking about my progress and growth...")
-
-# Footer
-st.divider()
-st.caption("💙 Remember: This is a support tool. For professional help, contact a mental health provider.")
-st.caption("🚨 Emergency (India): KIRAN 1800-599-0019 | Vandrevala 1860-2662-345 | Police 100")
-
-# Made with Bob
+st.caption(
+    f"This tool provides screening support and is not a medical diagnosis. "
+    f"Crisis support: **{HELPLINE_NAME} {HELPLINE_NUMBER}** (free, 24/7)"
+)

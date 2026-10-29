@@ -82,5 +82,3 @@ class Resource(Base):
     url = Column(String, nullable=True)
     priority = Column(String)  # low, medium, high
     created_at = Column(DateTime, default=datetime.utcnow)
-
-# Made with Bob

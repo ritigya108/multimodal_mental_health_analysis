@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import datetime
 
-st.set_page_config(page_title="Journal", page_icon="📝", layout="wide")
+st.set_page_config(page_title="Journal", page_icon="ðŸ“", layout="wide")
 
 # Try to import sentiment analyzers with better error handling
 SENTIMENT_AVAILABLE = False
@@ -10,9 +10,9 @@ try:
     analyzer = SentimentIntensityAnalyzer()
     SENTIMENT_AVAILABLE = True
 except Exception as e:
-    st.sidebar.warning(f"⚠️ Advanced sentiment analysis unavailable. Using simple analysis. Error: {str(e)[:50]}")
+    st.sidebar.warning(f"âš ï¸ Advanced sentiment analysis unavailable. Using simple analysis. Error: {str(e)[:50]}")
 
-st.title("My Journal 📝")
+st.title("My Journal ðŸ“")
 st.markdown("### Write your thoughts and feelings")
 
 # Initialize session state
@@ -58,7 +58,7 @@ def analyze_text_sentiment(text):
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.subheader("✍️ New Entry")
+    st.subheader("âœï¸ New Entry")
     
     # Journal entry input
     if st.session_state.clear_input:
@@ -81,20 +81,20 @@ with col1:
     col_btn1, col_btn2 = st.columns(2)
     
     with col_btn1:
-        if st.button("💾 Save Entry", type="primary", use_container_width=True):
+        if st.button("ðŸ’¾ Save Entry", type="primary", use_container_width=True):
             if entry_text and entry_text.strip():
                 # Analyze sentiment
                 sentiment_score = analyze_text_sentiment(entry_text)
                 
                 if sentiment_score >= 0.05:
                     sentiment = "Positive"
-                    emoji = "😊"
+                    emoji = "ðŸ˜Š"
                 elif sentiment_score <= -0.05:
                     sentiment = "Negative"
-                    emoji = "😔"
+                    emoji = "ðŸ˜”"
                 else:
                     sentiment = "Neutral"
-                    emoji = "😐"
+                    emoji = "ðŸ˜"
                 
                 # Save entry
                 st.session_state.journal_entries.insert(0, {
@@ -105,7 +105,7 @@ with col1:
                     'emoji': emoji
                 })
                 
-                st.success(f"✅ Entry saved! AI Analysis: {emoji} {sentiment} (Score: {sentiment_score:.2f})")
+                st.success(f"âœ… Entry saved! AI Analysis: {emoji} {sentiment} (Score: {sentiment_score:.2f})")
                 st.balloons()
                 
                 # Clear input
@@ -113,38 +113,38 @@ with col1:
                 st.session_state.temp_journal_text = ""
                 st.rerun()
             else:
-                st.warning("⚠️ Please write something before saving!")
+                st.warning("âš ï¸ Please write something before saving!")
     
     with col_btn2:
-        if st.button("🗑️ Clear", use_container_width=True):
+        if st.button("ðŸ—‘ï¸ Clear", use_container_width=True):
             st.session_state.clear_input = True
             st.session_state.temp_journal_text = ""
             st.rerun()
 
 with col2:
-    st.subheader("💡 Journaling Tips")
+    st.subheader("ðŸ’¡ Journaling Tips")
     
-    with st.expander("✍️ Be Honest", expanded=True):
+    with st.expander("âœï¸ Be Honest", expanded=True):
         st.write("Write freely without judgment. This is your safe space.")
     
-    with st.expander("💭 Express Emotions"):
+    with st.expander("ðŸ’­ Express Emotions"):
         st.write("Don't hold back. Let your feelings flow onto the page.")
     
-    with st.expander("🔍 Reflect on Patterns"):
+    with st.expander("ðŸ” Reflect on Patterns"):
         st.write("Review past entries to identify triggers and growth.")
     
-    with st.expander("🙏 Practice Gratitude"):
+    with st.expander("ðŸ™ Practice Gratitude"):
         st.write("Include things you're grateful for each day.")
     
     if SENTIMENT_AVAILABLE:
         st.success("""
-        **🤖 AI Analysis Active**
+        **ðŸ¤– AI Analysis Active**
         
         Using VADER sentiment analysis for accurate insights.
         """)
     else:
         st.info("""
-        **🤖 Simple Analysis Mode**
+        **ðŸ¤– Simple Analysis Mode**
         
         Using keyword-based sentiment analysis.
         
@@ -157,7 +157,7 @@ with col2:
 st.divider()
 
 # Display journal entries
-st.subheader("📚 Your Journal Entries")
+st.subheader("ðŸ“š Your Journal Entries")
 
 if st.session_state.journal_entries:
     for idx, entry in enumerate(st.session_state.journal_entries):
@@ -165,7 +165,7 @@ if st.session_state.journal_entries:
             col_date, col_sentiment = st.columns([3, 1])
             
             with col_date:
-                st.caption(f"📅 {entry['date'].strftime('%B %d, %Y at %I:%M %p')}")
+                st.caption(f"ðŸ“… {entry['date'].strftime('%B %d, %Y at %I:%M %p')}")
             
             with col_sentiment:
                 st.markdown(f"**{entry['emoji']} {entry['sentiment']}**")
@@ -178,19 +178,17 @@ if st.session_state.journal_entries:
                 st.caption(f"Sentiment Score: {entry['score']:.2f}")
             
             with col_actions:
-                if st.button("🗑️ Delete", key=f"del_{idx}"):
+                if st.button("ðŸ—‘ï¸ Delete", key=f"del_{idx}"):
                     st.session_state.journal_entries.pop(idx)
                     st.rerun()
             
             st.divider()
 else:
     st.info("""
-    📝 **No journal entries yet**
+    ðŸ“ **No journal entries yet**
     
     Start writing to track your thoughts and feelings. Your first entry is just a few words away!
     """)
 
 st.divider()
-st.caption("💙 Journaling helps you understand yourself better. Keep writing!")
-
-# Made with Bob
+st.caption("ðŸ’™ Journaling helps you understand yourself better. Keep writing!")

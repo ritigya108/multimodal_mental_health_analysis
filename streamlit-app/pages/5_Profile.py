@@ -1,9 +1,9 @@
 import streamlit as st
 from datetime import datetime
 
-st.set_page_config(page_title="Profile", page_icon="👤", layout="wide")
+st.set_page_config(page_title="Profile", page_icon="ðŸ‘¤", layout="wide")
 
-st.title("My Profile 👤")
+st.title("My Profile ðŸ‘¤")
 
 # Initialize profile data
 if 'profile' not in st.session_state:
@@ -40,13 +40,13 @@ with col1:
     st.divider()
     
     # Stats
-    st.subheader("📊 Your Stats")
+    st.subheader("ðŸ“Š Your Stats")
     
     st.metric("Member Since", st.session_state.profile['join_date'])
     st.metric("Mood Logs", st.session_state.profile['total_mood_logs'])
     st.metric("Journal Entries", st.session_state.profile['total_journal_entries'])
-    st.metric("Current Streak", f"{st.session_state.profile['current_streak']} days 🔥")
-    st.metric("Longest Streak", f"{st.session_state.profile['longest_streak']} days 🏆")
+    st.metric("Current Streak", f"{st.session_state.profile['current_streak']} days ðŸ”¥")
+    st.metric("Longest Streak", f"{st.session_state.profile['longest_streak']} days ðŸ†")
 
 with col2:
     # Personal Information
@@ -62,9 +62,9 @@ with col2:
         
         col_save, col_cancel = st.columns(2)
         with col_save:
-            submitted = st.form_submit_button("💾 Save Changes", type="primary", use_container_width=True)
+            submitted = st.form_submit_button("ðŸ’¾ Save Changes", type="primary", use_container_width=True)
         with col_cancel:
-            cancel = st.form_submit_button("❌ Cancel", use_container_width=True)
+            cancel = st.form_submit_button("âŒ Cancel", use_container_width=True)
         
         if submitted:
             st.session_state.profile.update({
@@ -75,55 +75,53 @@ with col2:
                 'emergency_contact': emergency_contact,
                 'bio': bio
             })
-            st.success("✅ Profile updated successfully!")
+            st.success("âœ… Profile updated successfully!")
             st.balloons()
     
     st.divider()
     
     # Notification Settings
-    st.subheader("🔔 Notification Settings")
+    st.subheader("ðŸ”” Notification Settings")
     
     email_notif = st.toggle("Email Notifications", value=True, help="Receive updates via email")
     daily_reminder = st.toggle("Daily Check-in Reminders", value=True, help="Get reminded to log your mood")
     weekly_reports = st.toggle("Weekly Progress Reports", value=False, help="Receive weekly summaries")
     crisis_alerts = st.toggle("Crisis Alerts", value=True, help="Immediate support when needed")
     
-    if st.button("💾 Save Notification Settings", use_container_width=True):
-        st.success("✅ Notification settings saved!")
+    if st.button("ðŸ’¾ Save Notification Settings", use_container_width=True):
+        st.success("âœ… Notification settings saved!")
     
     st.divider()
     
     # Security
-    st.subheader("🔒 Security")
+    st.subheader("ðŸ”’ Security")
     
     col_sec1, col_sec2 = st.columns(2)
     with col_sec1:
-        if st.button("🔑 Change Password", use_container_width=True):
+        if st.button("ðŸ”‘ Change Password", use_container_width=True):
             st.info("Password change feature coming soon!")
     with col_sec2:
-        if st.button("🔐 Two-Factor Auth", use_container_width=True):
+        if st.button("ðŸ” Two-Factor Auth", use_container_width=True):
             st.info("2FA setup coming soon!")
     
-    if st.button("📥 Download My Data", use_container_width=True):
+    if st.button("ðŸ“¥ Download My Data", use_container_width=True):
         st.info("Data export feature coming soon!")
     
     st.divider()
     
     # Danger Zone
-    st.error("⚠️ **Danger Zone**")
+    st.error("âš ï¸ **Danger Zone**")
     st.caption("These actions are permanent and cannot be undone.")
     
     col_del1, col_del2 = st.columns(2)
     with col_del1:
-        if st.button("🗑️ Delete All Entries", use_container_width=True):
+        if st.button("ðŸ—‘ï¸ Delete All Entries", use_container_width=True):
             if st.checkbox("I understand this action is permanent"):
                 st.warning("This would delete all your journal entries and mood logs.")
     with col_del2:
-        if st.button("❌ Delete Account", use_container_width=True):
+        if st.button("âŒ Delete Account", use_container_width=True):
             if st.checkbox("I want to delete my account", key="delete_account"):
                 st.error("This would permanently delete your account and all data.")
 
 st.divider()
-st.caption("💙 Your data is secure and private. We never share your information with third parties.")
-
-# Made with Bob
+st.caption("ðŸ’™ Your data is secure and private. We never share your information with third parties.")

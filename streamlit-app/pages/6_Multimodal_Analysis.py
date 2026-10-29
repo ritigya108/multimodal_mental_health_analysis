@@ -1,5 +1,5 @@
 """
-Multimodal Mental Health Analysis — Streamlit Page
+Multimodal Mental Health Analysis â€” Streamlit Page
 ====================================================
 Works TODAY without the DAIC-WOZ dataset.
 When a trained model checkpoint is present (backend/checkpoints/daic/best.pt),
@@ -15,11 +15,11 @@ from datetime import datetime
 
 st.set_page_config(
     page_title="Multimodal Analysis",
-    page_icon="🧠",
+    page_icon="ðŸ§ ",
     layout="wide",
 )
 
-# ── Constants ─────────────────────────────────────────────────────────────────
+# â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Resolution order:
 #   1. st.secrets["BACKEND_URL"]   (Streamlit Cloud secrets)
 #   2. BACKEND_URL env var          (Docker / local env)
@@ -36,44 +36,44 @@ RISK_COLORS = {
     "critical": "#7c3aed",
 }
 RISK_EMOJIS = {
-    "low":      "🟢",
-    "moderate": "🟡",
-    "high":     "🔴",
-    "critical": "🚨",
+    "low":      "ðŸŸ¢",
+    "moderate": "ðŸŸ¡",
+    "high":     "ðŸ”´",
+    "critical": "ðŸš¨",
 }
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
+# â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 with st.sidebar:
-    st.markdown("## 🧠 Multimodal Analysis")
+    st.markdown("## ðŸ§  Multimodal Analysis")
     st.caption("AI-powered mental health assessment using text, audio, and video.")
 
     st.divider()
 
-    st.markdown("### 📡 Backend Status")
+    st.markdown("### ðŸ“¡ Backend Status")
     try:
         r = requests.get(f"{BACKEND_URL}/health", timeout=2)
         if r.status_code == 200:
-            st.success("✅ Backend online")
+            st.success("âœ… Backend online")
         else:
-            st.warning("⚠️ Backend returned non-200")
+            st.warning("âš ï¸ Backend returned non-200")
     except Exception:
-        st.error("❌ Backend offline\nStart it with:\n```\npython backend/main.py\n```")
+        st.error("âŒ Backend offline\nStart it with:\n```\npython backend/main.py\n```")
 
     st.divider()
 
-    st.error("**🚨 Crisis Support (India)**")
+    st.error("**ðŸš¨ Crisis Support (India)**")
     st.markdown("**KIRAN: 1800-599-0019** (free, 24/7)")
     st.markdown("**iCall: 9152987821**")
     st.markdown("**Vandrevala: 1860-2662-345**")
 
     st.divider()
     st.caption(
-        "ℹ️ This tool uses a linguistic heuristic when no trained model is "
+        "â„¹ï¸ This tool uses a linguistic heuristic when no trained model is "
         "available. Connect the backend to a trained checkpoint for neural inference."
     )
 
-# ── Main content ─────────────────────────────────────────────────────────────
-st.title("🎭 Multimodal Mental Health Analysis")
+# â”€â”€ Main content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+st.title("ðŸŽ­ Multimodal Mental Health Analysis")
 st.markdown(
     "Submit a **text transcript** (required) and optionally an **audio** or **video** file. "
     "The system combines all available modalities to assess mental health indicators."
@@ -83,20 +83,20 @@ st.info(
     "**How it works without the DAIC-WOZ dataset:**  \n"
     "The backend uses advanced linguistic feature extraction (first-person pronoun rate, "
     "negative/positive vocabulary ratio, crisis keyword detection) to produce a risk assessment. "
-    "Once you train on DAIC-WOZ, the same page automatically switches to neural inference — "
+    "Once you train on DAIC-WOZ, the same page automatically switches to neural inference â€” "
     "**no frontend changes needed**.",
-    icon="ℹ️",
+    icon="â„¹ï¸",
 )
 
 st.divider()
 
-# ── Input form ────────────────────────────────────────────────────────────────
+# â”€â”€ Input form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 col_left, col_right = st.columns([2, 1])
 
 with col_left:
-    st.subheader("📝 Transcript / Text")
+    st.subheader("ðŸ“ Transcript / Text")
     sample_texts = {
-        "Select a sample…": "",
+        "Select a sampleâ€¦": "",
         "Low risk (positive)": (
             "Today was actually a good day. I went for a walk in the morning and felt "
             "peaceful. I am grateful for my family and feeling motivated about my goals. "
@@ -126,17 +126,17 @@ with col_left:
         value=default_text,
         height=220,
         placeholder=(
-            "Paste a conversation transcript, journal entry, or any text here…\n\n"
+            "Paste a conversation transcript, journal entry, or any text hereâ€¦\n\n"
             "Example: 'I have been feeling really down lately. Everything seems overwhelming "
             "and I can't find the energy to do things I used to enjoy.'"
         ),
     )
     char_count = len(transcript)
     word_count = len(transcript.split()) if transcript.strip() else 0
-    st.caption(f"{word_count} words · {char_count} characters")
+    st.caption(f"{word_count} words Â· {char_count} characters")
 
 with col_right:
-    st.subheader("🎵 Audio (optional)")
+    st.subheader("ðŸŽµ Audio (optional)")
     audio_file = st.file_uploader(
         "Upload audio file",
         type=["wav", "mp3", "m4a", "flac", "ogg"],
@@ -144,9 +144,9 @@ with col_right:
     )
     if audio_file:
         st.audio(audio_file)
-        st.success(f"✅ {audio_file.name}")
+        st.success(f"âœ… {audio_file.name}")
 
-    st.subheader("🎥 Video (optional)")
+    st.subheader("ðŸŽ¥ Video (optional)")
     video_file = st.file_uploader(
         "Upload video file",
         type=["mp4", "avi", "mov", "mkv"],
@@ -154,27 +154,27 @@ with col_right:
     )
     if video_file:
         st.video(video_file)
-        st.success(f"✅ {video_file.name}")
+        st.success(f"âœ… {video_file.name}")
 
     if video_file and not audio_file:
-        st.info("💡 Tip: Upload the matching audio file alongside the video for better results.")
+        st.info("ðŸ’¡ Tip: Upload the matching audio file alongside the video for better results.")
 
 st.divider()
 
-# ── Run analysis ──────────────────────────────────────────────────────────────
+# â”€â”€ Run analysis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 run_btn = st.button(
-    "🚀 Run Multimodal Analysis",
+    "ðŸš€ Run Multimodal Analysis",
     type="primary",
     use_container_width=True,
     disabled=not transcript.strip(),
 )
 
 if not transcript.strip():
-    st.caption("⬆️ Enter some text above to enable analysis.")
+    st.caption("â¬†ï¸ Enter some text above to enable analysis.")
 
-# ── Results ───────────────────────────────────────────────────────────────────
+# â”€â”€ Results â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if run_btn and transcript.strip():
-    with st.spinner("Analysing… (combining text, audio, and video modalities)"):
+    with st.spinner("Analysingâ€¦ (combining text, audio, and video modalities)"):
         try:
             # Build multipart form data
             files = {}
@@ -198,29 +198,29 @@ if run_btn and transcript.strip():
 
         except requests.exceptions.ConnectionError:
             st.error(
-                "❌ Cannot connect to backend.  \n"
+                "âŒ Cannot connect to backend.  \n"
                 "Start it with: `cd multimodal_mental_health_analysis/backend && python main.py`"
             )
             st.stop()
         except requests.exceptions.HTTPError as e:
-            st.error(f"❌ Backend error: {e.response.text}")
+            st.error(f"âŒ Backend error: {e.response.text}")
             st.stop()
         except Exception as e:
-            st.error(f"❌ Unexpected error: {e}")
+            st.error(f"âŒ Unexpected error: {e}")
             st.stop()
 
-    # ── Store in session state ─────────────────────────────────────────────
+    # â”€â”€ Store in session state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if "analysis_history" not in st.session_state:
         st.session_state.analysis_history = []
     st.session_state.analysis_history.append({
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "result": result,
-        "text_preview": transcript[:80] + ("…" if len(transcript) > 80 else ""),
+        "text_preview": transcript[:80] + ("â€¦" if len(transcript) > 80 else ""),
     })
 
-    # ─────────────────────────────────────────────────────────────────────
+    # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     # RESULTS DISPLAY
-    # ─────────────────────────────────────────────────────────────────────
+    # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     risk = result.get("risk_level", "low")
     dep_prob = result.get("depression_probability", 0.0)
@@ -228,25 +228,25 @@ if run_btn and transcript.strip():
     model_used = result.get("model_used", "heuristic")
     note = result.get("note", "")
 
-    st.success("✅ Analysis complete!")
+    st.success("âœ… Analysis complete!")
 
-    # ── Crisis banner (always shown first) ────────────────────────────────
+    # â”€â”€ Crisis banner (always shown first) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     crisis = result.get("crisis_flags", {})
     if crisis.get("high_risk_detected"):
         st.error(
-            "🚨 **CRITICAL: Potential crisis detected.**  \n"
+            "ðŸš¨ **CRITICAL: Potential crisis detected.**  \n"
             "Please contact a mental health professional immediately.  \n"
             "**KIRAN: 1800-599-0019 (India, free, 24/7)**  |  "
             "iCall: 9152987821  |  Vandrevala: 1860-2662-345"
         )
     elif crisis.get("medium_risk_detected"):
         st.warning(
-            "⚠️ **Elevated distress signals detected.**  \n"
+            "âš ï¸ **Elevated distress signals detected.**  \n"
             "Consider reaching out to a mental health professional.  \n"
             "KIRAN: 1800-599-0019 (free, 24/7)"
         )
 
-    # ── Top metrics row ────────────────────────────────────────────────────
+    # â”€â”€ Top metrics row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     m1, m2, m3, m4 = st.columns(4)
 
     with m1:
@@ -264,26 +264,26 @@ if run_btn and transcript.strip():
         st.metric("Depression Probability", f"{dep_prob * 100:.1f}%", help="0% = no risk, 100% = high risk")
 
     with m3:
-        st.metric("PHQ-8 Estimate", f"{phq8} / 24", help="PHQ-8 ≥10 = moderate–severe depression")
+        st.metric("PHQ-8 Estimate", f"{phq8} / 24", help="PHQ-8 â‰¥10 = moderateâ€“severe depression")
 
     with m4:
         label = "Depressed" if result.get("binary_prediction", 0) else "Not Depressed"
-        icon  = "🔴" if result.get("binary_prediction", 0) else "🟢"
+        icon  = "ðŸ”´" if result.get("binary_prediction", 0) else "ðŸŸ¢"
         st.metric("Binary Classification", f"{icon} {label}")
 
     st.caption(
-        f"Model: **{model_used}** · "
-        f"Modalities used: text{'  + audio' if audio_file else ''}{'  + video' if video_file else ''} · "
+        f"Model: **{model_used}** Â· "
+        f"Modalities used: text{'  + audio' if audio_file else ''}{'  + video' if video_file else ''} Â· "
         f"{note}"
     )
 
     st.divider()
 
-    # ── Charts row ─────────────────────────────────────────────────────────
+    # â”€â”€ Charts row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     c1, c2 = st.columns(2)
 
     with c1:
-        st.subheader("🎯 Modality Contribution")
+        st.subheader("ðŸŽ¯ Modality Contribution")
         mw = result.get("modality_weights", {})
         labels = [k.title() for k, v in mw.items() if v > 0]
         values = [v for v in mw.values() if v > 0]
@@ -305,7 +305,7 @@ if run_btn and transcript.strip():
             st.info("No modality weight data available.")
 
     with c2:
-        st.subheader("📊 Risk Score Gauge")
+        st.subheader("ðŸ“Š Risk Score Gauge")
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number",
             value=dep_prob * 100,
@@ -331,39 +331,39 @@ if run_btn and transcript.strip():
 
     st.divider()
 
-    # ── Linguistic features ────────────────────────────────────────────────
+    # â”€â”€ Linguistic features â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     lf = result.get("linguistic_features", {})
     if lf:
-        st.subheader("🔬 Linguistic Features")
+        st.subheader("ðŸ”¬ Linguistic Features")
         lf1, lf2, lf3, lf4 = st.columns(4)
-        lf1.metric("Word Count",          lf.get("word_count", "—"))
+        lf1.metric("Word Count",          lf.get("word_count", "â€”"))
         lf2.metric("First-Person Rate",   f"{lf.get('first_person_ratio', 0)*100:.1f}%",
                    help="High first-person pronoun use correlates with depression")
         lf3.metric("Negative Word Rate",  f"{lf.get('negative_word_ratio', 0)*100:.1f}%")
         lf4.metric("Positive Word Rate",  f"{lf.get('positive_word_ratio', 0)*100:.1f}%")
         st.divider()
 
-    # ── Recommendations ────────────────────────────────────────────────────
+    # â”€â”€ Recommendations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     recs = result.get("recommendations", [])
     if recs:
-        st.subheader("💡 Personalised Recommendations")
+        st.subheader("ðŸ’¡ Personalised Recommendations")
         for rec in recs:
-            if rec.startswith("⚠️"):
+            if rec.startswith("âš ï¸"):
                 st.error(rec)
             else:
                 st.markdown(f"- {rec}")
 
     st.divider()
 
-    # ── Raw JSON (collapsible) ─────────────────────────────────────────────
-    with st.expander("🔧 View raw API response (for debugging)"):
+    # â”€â”€ Raw JSON (collapsible) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    with st.expander("ðŸ”§ View raw API response (for debugging)"):
         st.json(result)
 
 
-# ── Analysis history ──────────────────────────────────────────────────────────
+# â”€â”€ Analysis history â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if "analysis_history" in st.session_state and st.session_state.analysis_history:
     st.divider()
-    st.subheader("📋 Session History")
+    st.subheader("ðŸ“‹ Session History")
     for i, h in enumerate(reversed(st.session_state.analysis_history[-5:]), 1):
         r = h["result"]
         risk_h = r.get("risk_level", "low")
@@ -373,16 +373,14 @@ if "analysis_history" in st.session_state and st.session_state.analysis_history:
         col_c.caption(h["timestamp"])
 
 
-# ── Footer ────────────────────────────────────────────────────────────────────
+# â”€â”€ Footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 st.divider()
 st.caption(
-    "⚠️ **Disclaimer:** This tool is for research and support purposes only. "
+    "âš ï¸ **Disclaimer:** This tool is for research and support purposes only. "
     "It is NOT a substitute for professional mental health diagnosis or treatment. "
     "Always consult a qualified mental health professional."
 )
 st.caption(
-    "🚨 **Emergency (India):** KIRAN 1800-599-0019 · iCall 9152987821 · "
-    "Vandrevala 1860-2662-345 · Police 100"
+    "ðŸš¨ **Emergency (India):** KIRAN 1800-599-0019 Â· iCall 9152987821 Â· "
+    "Vandrevala 1860-2662-345 Â· Police 100"
 )
-
-# Made with Bob

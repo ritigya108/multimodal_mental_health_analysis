@@ -1,13 +1,13 @@
 import streamlit as st
 
-st.set_page_config(page_title="Resources", page_icon="📚", layout="wide")
+st.set_page_config(page_title="Resources", page_icon="ðŸ“š", layout="wide")
 
-st.title("Mental Health Resources 📚")
+st.title("Mental Health Resources ðŸ“š")
 st.markdown("### Curated resources to support your mental health journey")
 
 # Emergency alert
 st.error("""
-**🚨 In Crisis? Get Help Now (India)**
+**ðŸš¨ In Crisis? Get Help Now (India)**
 
 If you're in immediate danger, call **100** (Police) or **102** (Ambulance).
 
@@ -20,10 +20,10 @@ For mental health crisis support:
 st.divider()
 
 # Search
-search = st.text_input("🔍 Search resources...", placeholder="Search for articles, videos, exercises...")
+search = st.text_input("ðŸ” Search resources...", placeholder="Search for articles, videos, exercises...")
 
 # Tabs
-tab1, tab2, tab3, tab4 = st.tabs(["📞 Crisis Hotlines", "📄 Articles", "🎥 Videos", "🧘 Exercises"])
+tab1, tab2, tab3, tab4 = st.tabs(["ðŸ“ž Crisis Hotlines", "ðŸ“„ Articles", "ðŸŽ¥ Videos", "ðŸ§˜ Exercises"])
 
 with tab1:
     st.subheader("Crisis Hotlines")
@@ -32,7 +32,7 @@ with tab1:
     
     with col1:
         st.error("""
-        ### 🚨 KIRAN Mental Health Helpline
+        ### ðŸš¨ KIRAN Mental Health Helpline
         **24/7 free and confidential support**
         
         **Call: 1800-599-0019**
@@ -41,7 +41,7 @@ with tab1:
         """)
         
         st.warning("""
-        ### 💬 Vandrevala Foundation
+        ### ðŸ’¬ Vandrevala Foundation
         **24/7 crisis support**
         
         **Call: 1860-2662-345**
@@ -51,7 +51,7 @@ with tab1:
         """)
         
         st.info("""
-        ### 🏥 iCall Psychosocial Helpline
+        ### ðŸ¥ iCall Psychosocial Helpline
         **Professional counseling**
         
         **Call: 9152987821**
@@ -62,7 +62,7 @@ with tab1:
     
     with col2:
         st.info("""
-        ### 🎗️ NIMHANS Helpline (Bangalore)
+        ### ðŸŽ—ï¸ NIMHANS Helpline (Bangalore)
         **Mental health support**
         
         **Call: 080-46110007**
@@ -71,7 +71,7 @@ with tab1:
         """)
         
         st.success("""
-        ### 🤝 Snehi (Delhi NCR)
+        ### ðŸ¤ Snehi (Delhi NCR)
         **Emotional support**
         
         **Call: 011-65978181**
@@ -80,7 +80,7 @@ with tab1:
         """)
         
         st.warning("""
-        ### 🌈 Mitram Foundation (Chennai)
+        ### ðŸŒˆ Mitram Foundation (Chennai)
         **LGBTQ+ support**
         
         **Call: 044-24640050**
@@ -126,9 +126,9 @@ with tab2:
         with st.container():
             col1, col2 = st.columns([3, 1])
             with col1:
-                st.markdown(f"### 📄 {article['title']}")
+                st.markdown(f"### ðŸ“„ {article['title']}")
                 st.write(article['desc'])
-                st.caption(f"🏷️ {article['category']} • ⏱️ {article['time']}")
+                st.caption(f"ðŸ·ï¸ {article['category']} â€¢ â±ï¸ {article['time']}")
             with col2:
                 st.link_button("Read Article", article['url'], use_container_width=True)
             st.divider()
@@ -167,11 +167,11 @@ with tab3:
     for idx, video in enumerate(videos):
         with cols[idx % 2]:
             st.info(f"""
-            ### 🎥 {video['title']}
+            ### ðŸŽ¥ {video['title']}
             
             {video['desc']}
             
-            **Duration:** {video['duration']} • **Category:** {video['category']}
+            **Duration:** {video['duration']} â€¢ **Category:** {video['category']}
             """)
             st.button("Watch Video", key=f"video_{idx}", use_container_width=True)
 
@@ -220,13 +220,13 @@ with tab4:
     cols = st.columns(3)
     for idx, exercise in enumerate(exercises):
         with cols[idx % 3]:
-            difficulty_color = "🟢" if exercise['difficulty'] == "Beginner" else "🟡"
+            difficulty_color = "ðŸŸ¢" if exercise['difficulty'] == "Beginner" else "ðŸŸ¡"
             st.success(f"""
-            ### 🧘 {exercise['title']}
+            ### ðŸ§˜ {exercise['title']}
             
             {exercise['desc']}
             
-            **⏱️ {exercise['duration']}** • **{difficulty_color} {exercise['difficulty']}**
+            **â±ï¸ {exercise['duration']}** â€¢ **{difficulty_color} {exercise['difficulty']}**
             """)
             st.button("Try Exercise", key=f"ex_{idx}", use_container_width=True)
 
@@ -234,7 +234,7 @@ st.divider()
 
 # Professional help
 st.info("""
-### 🏥 Find Professional Help
+### ðŸ¥ Find Professional Help
 
 These resources can help you find mental health professionals in your area:
 """)
@@ -248,6 +248,4 @@ with col3:
     st.link_button("SAMHSA", "https://www.samhsa.gov/find-help/national-helpline", use_container_width=True)
 
 st.divider()
-st.caption("💙 Remember: These resources complement but don't replace professional mental health care.")
-
-# Made with Bob
+st.caption("ðŸ’™ Remember: These resources complement but don't replace professional mental health care.")

@@ -2,9 +2,9 @@ import streamlit as st
 from datetime import datetime
 import time
 
-st.set_page_config(page_title="AI Chat", page_icon="💬", layout="wide")
+st.set_page_config(page_title="AI Chat", page_icon="ðŸ’¬", layout="wide")
 
-st.title("AI Mental Health Chat 💬")
+st.title("AI Mental Health Chat ðŸ’¬")
 st.markdown("### Talk to your AI companion")
 
 # Initialize chat history
@@ -19,7 +19,7 @@ if 'chat_messages' not in st.session_state:
 
 # Crisis alert
 st.error("""
-**⚠️ Important:** This AI chatbot is for support and information only. It's not a replacement for professional mental health care.
+**âš ï¸ Important:** This AI chatbot is for support and information only. It's not a replacement for professional mental health care.
 
 **In case of emergency (India):**
 - **KIRAN**: 1800-599-0019 (24/7)
@@ -66,7 +66,7 @@ def get_bot_response(user_message):
     if any(word in message_lower for word in ['suicide', 'kill myself', 'end my life', 'want to die']):
         return """I'm very concerned about what you're sharing. Please reach out to a crisis counselor immediately.
 
-**🚨 Crisis Resources (India):**
+**ðŸš¨ Crisis Resources (India):**
 - **KIRAN: 1800-599-0019** - Mental Health Helpline (24/7)
 - **Vandrevala: 1860-2662-345** - Crisis Support (24/7)
 - **Police: 100** | **Ambulance: 102** if you're in immediate danger
@@ -114,7 +114,7 @@ Would you like some resources for professional help?"""
     
     # Good feelings
     elif any(word in message_lower for word in ['good', 'great', 'happy', 'better']):
-        return """That's wonderful to hear! I'm so glad you're having a good day. 😊
+        return """That's wonderful to hear! I'm so glad you're having a good day. ðŸ˜Š
 
 What's been going well for you? Celebrating positive moments is important for mental health.
 
@@ -169,14 +169,14 @@ Can you tell me more about how you're feeling? I'm here to help in any way I can
 
 # Sidebar with resources
 with st.sidebar:
-    st.subheader("🆘 Crisis Resources (India)")
+    st.subheader("ðŸ†˜ Crisis Resources (India)")
     st.error("**1800-599-0019** - KIRAN Helpline")
     st.warning("**1860-2662-345** - Vandrevala Foundation")
     st.info("**100** - Police | **102** - Ambulance")
     
     st.divider()
     
-    st.subheader("💡 Chat Tips")
+    st.subheader("ðŸ’¡ Chat Tips")
     st.write("""
     - Be honest about your feelings
     - Take your time to express yourself
@@ -209,7 +209,7 @@ if user_input:
     
     st.rerun()
     
-    if st.button("🔄 New Conversation", use_container_width=True):
+    if st.button("ðŸ”„ New Conversation", use_container_width=True):
         st.session_state.chat_messages = [
             {
                 "role": "assistant",
@@ -220,6 +220,4 @@ if user_input:
         st.rerun()
 
 st.divider()
-st.caption("💙 This AI provides support but is not a replacement for professional mental health care.")
-
-# Made with Bob
+st.caption("ðŸ’™ This AI provides support but is not a replacement for professional mental health care.")

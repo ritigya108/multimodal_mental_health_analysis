@@ -55,13 +55,13 @@ import {
 } from 'recharts';
 import apiService from '../services/api';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const RISK_META = {
-  low:      { color: '#10b981', bg: '#d1fae5', label: 'Low Risk',      icon: '🟢' },
-  moderate: { color: '#f59e0b', bg: '#fef3c7', label: 'Moderate Risk', icon: '🟡' },
-  high:     { color: '#ef4444', bg: '#fee2e2', label: 'High Risk',      icon: '🔴' },
-  critical: { color: '#7c3aed', bg: '#ede9fe', label: 'Critical',       icon: '🚨' },
+  low:      { color: '#10b981', bg: '#d1fae5', label: 'Low Risk',      icon: 'ðŸŸ¢' },
+  moderate: { color: '#f59e0b', bg: '#fef3c7', label: 'Moderate Risk', icon: 'ðŸŸ¡' },
+  high:     { color: '#ef4444', bg: '#fee2e2', label: 'High Risk',      icon: 'ðŸ”´' },
+  critical: { color: '#7c3aed', bg: '#ede9fe', label: 'Critical',       icon: 'ðŸš¨' },
 };
 
 function getRisk(r) {
@@ -91,7 +91,7 @@ function FeatureBar({ label, value, max = 1, color = '#6366f1' }) {
 }
 
 const SAMPLE_TEXTS = {
-  '— select a sample —': '',
+  'â€” select a sample â€”': '',
   'Low risk (positive)':
     'Today was actually a good day. I went for a walk in the morning and felt ' +
     'peaceful. I am grateful for my family and feeling motivated about my goals. ' +
@@ -110,14 +110,14 @@ const SAMPLE_TEXTS = {
     'I cannot take it anymore. I have lost all hope.',
 };
 
-// ── Main component ────────────────────────────────────────────────────────────
+// â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function MultimodalAnalysis() {
   const [activeTab, setActiveTab]   = useState(0);
   const [audioFile, setAudioFile]   = useState(null);
   const [videoFile, setVideoFile]   = useState(null);
   const [textInput, setTextInput]   = useState('');
-  const [sampleKey, setSampleKey]   = useState('— select a sample —');
+  const [sampleKey, setSampleKey]   = useState('â€” select a sample â€”');
   const [analyzing, setAnalyzing]   = useState(false);
   const [results, setResults]       = useState(null);
   const [error, setError]           = useState('');
@@ -126,7 +126,7 @@ function MultimodalAnalysis() {
   const audioRef = useRef();
   const videoRef = useRef();
 
-  // ── File handlers ──────────────────────────────────────────────────────────
+  // â”€â”€ File handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleAudioChange = (e) => {
     const f = e.target.files[0];
     if (f) { setAudioFile(f); setSnack(`Audio loaded: ${f.name}`); }
@@ -138,14 +138,14 @@ function MultimodalAnalysis() {
     e.target.value = '';
   };
 
-  // ── Sample text loader ─────────────────────────────────────────────────────
+  // â”€â”€ Sample text loader â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleSampleChange = (e) => {
     const key = e.target.value;
     setSampleKey(key);
     setTextInput(SAMPLE_TEXTS[key] || '');
   };
 
-  // ── Analyse ────────────────────────────────────────────────────────────────
+  // â”€â”€ Analyse â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleAnalyze = async () => {
     if (!textInput.trim()) {
       setError('Please enter some text before running the analysis.');
@@ -160,7 +160,7 @@ function MultimodalAnalysis() {
       setResults(data);
       setActiveTab(0);
     } catch (err) {
-      // FastAPI 422 detail is an array of objects [{type,loc,msg,input}] — stringify it
+      // FastAPI 422 detail is an array of objects [{type,loc,msg,input}] â€” stringify it
       const detail = err.response?.data?.detail;
       let msg;
       if (Array.isArray(detail)) {
@@ -176,7 +176,7 @@ function MultimodalAnalysis() {
     }
   };
 
-  // ── Derived values from results ────────────────────────────────────────────
+  // â”€â”€ Derived values from results â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const risk        = results ? getRisk(results.risk_level) : null;
   const depPct      = results ? Math.round(results.depression_probability * 100) : 0;
   const lf          = results?.linguistic_features || {};
@@ -201,10 +201,10 @@ function MultimodalAnalysis() {
   return (
     <Container maxWidth="xl" sx={{ mt: 3, mb: 6 }}>
 
-      {/* ── Page header ────────────────────────────────────────────────── */}
+      {/* â”€â”€ Page header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" fontWeight={700} gutterBottom>
-          🎭 Multimodal Mental Health Analysis
+          ðŸŽ­ Multimodal Mental Health Analysis
         </Typography>
         <Typography variant="body1" color="text.secondary">
           Submit a text transcript (required) and optionally an audio or video file.
@@ -212,7 +212,7 @@ function MultimodalAnalysis() {
         </Typography>
       </Box>
 
-      {/* ── Input section ───────────────────────────────────────────────── */}
+      {/* â”€â”€ Input section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
 
         {/* Text input (left, 2/3) */}
@@ -247,7 +247,7 @@ function MultimodalAnalysis() {
                 minRows={7}
                 maxRows={14}
                 placeholder={
-                  'Paste a conversation transcript, journal entry, or any text here…\n\n' +
+                  'Paste a conversation transcript, journal entry, or any text hereâ€¦\n\n' +
                   'Example: "I have been feeling really down lately. Everything seems ' +
                   'overwhelming and I cannot find the energy to do things I used to enjoy."'
                 }
@@ -256,7 +256,7 @@ function MultimodalAnalysis() {
                 variant="outlined"
               />
               <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                {textInput.split(/\s+/).filter(Boolean).length} words · {textInput.length} characters
+                {textInput.split(/\s+/).filter(Boolean).length} words Â· {textInput.length} characters
               </Typography>
             </CardContent>
           </Card>
@@ -276,13 +276,13 @@ function MultimodalAnalysis() {
                     <Chip label="Optional" size="small" variant="outlined" sx={{ ml: 'auto' }} />
                   </Box>
                   <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
-                    WAV · MP3 · M4A · FLAC · OGG
+                    WAV Â· MP3 Â· M4A Â· FLAC Â· OGG
                   </Typography>
 
                   {audioFile ? (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Chip
-                        label={audioFile.name.length > 22 ? audioFile.name.slice(0, 20) + '…' : audioFile.name}
+                        label={audioFile.name.length > 22 ? audioFile.name.slice(0, 20) + 'â€¦' : audioFile.name}
                         color="primary"
                         variant="outlined"
                         size="small"
@@ -320,13 +320,13 @@ function MultimodalAnalysis() {
                     <Chip label="Optional" size="small" variant="outlined" sx={{ ml: 'auto' }} />
                   </Box>
                   <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
-                    MP4 · AVI · MOV · MKV
+                    MP4 Â· AVI Â· MOV Â· MKV
                   </Typography>
 
                   {videoFile ? (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Chip
-                        label={videoFile.name.length > 22 ? videoFile.name.slice(0, 20) + '…' : videoFile.name}
+                        label={videoFile.name.length > 22 ? videoFile.name.slice(0, 20) + 'â€¦' : videoFile.name}
                         color="secondary"
                         variant="outlined"
                         size="small"
@@ -373,14 +373,14 @@ function MultimodalAnalysis() {
         </Grid>
       </Grid>
 
-      {/* ── Error ───────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Error â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
           {String(error)}
         </Alert>
       )}
 
-      {/* ── Analyse button ───────────────────────────────────────────────── */}
+      {/* â”€â”€ Analyse button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Box sx={{ mb: 4, textAlign: 'center' }}>
         <Button
           variant="contained"
@@ -390,7 +390,7 @@ function MultimodalAnalysis() {
           disabled={!textInput.trim() || analyzing}
           sx={{ px: 6, py: 1.5, fontSize: '1rem' }}
         >
-          {analyzing ? 'Analysing…' : 'Run Multimodal Analysis'}
+          {analyzing ? 'Analysingâ€¦' : 'Run Multimodal Analysis'}
         </Button>
         {!textInput.trim() && (
           <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
@@ -399,25 +399,25 @@ function MultimodalAnalysis() {
         )}
       </Box>
 
-      {/* ── Analysing progress bar ───────────────────────────────────────── */}
+      {/* â”€â”€ Analysing progress bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {analyzing && (
         <Paper sx={{ p: 3, mb: 4, textAlign: 'center' }} elevation={1}>
           <LinearProgress sx={{ mb: 2, borderRadius: 2 }} />
           <Typography variant="body2" color="text.secondary">
-            Extracting linguistic features · computing risk score · fusing modalities…
+            Extracting linguistic features Â· computing risk score Â· fusing modalitiesâ€¦
           </Typography>
         </Paper>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           RESULTS
-      ══════════════════════════════════════════════════════════════════ */}
+      â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       {results && !analyzing && (
         <>
-          {/* ── Crisis banner ─────────────────────────────────────────── */}
+          {/* â”€â”€ Crisis banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           {crisis.high_risk_detected && (
             <Alert severity="error" icon={<ErrorOutline />} sx={{ mb: 3, fontSize: '1rem' }}>
-              <strong>🚨 CRITICAL: Potential crisis language detected.</strong><br />
+              <strong>ðŸš¨ CRITICAL: Potential crisis language detected.</strong><br />
               Please contact a mental health professional immediately.<br />
               <strong>KIRAN: 1800-599-0019</strong> (India, free, 24/7) &nbsp;|&nbsp;
               iCall: 9152987821 &nbsp;|&nbsp; Vandrevala: 1860-2662-345
@@ -425,12 +425,12 @@ function MultimodalAnalysis() {
           )}
           {!crisis.high_risk_detected && crisis.medium_risk_detected && (
             <Alert severity="warning" sx={{ mb: 3 }}>
-              <strong>⚠️ Elevated distress signals detected.</strong> Consider reaching out to a
+              <strong>âš ï¸ Elevated distress signals detected.</strong> Consider reaching out to a
               mental health professional. KIRAN: 1800-599-0019 (free, 24/7)
             </Alert>
           )}
 
-          {/* ── Top KPI row ───────────────────────────────────────────── */}
+          {/* â”€â”€ Top KPI row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
             {/* Risk level */}
             <Grid item xs={12} sm={6} md={3}>
@@ -476,7 +476,7 @@ function MultimodalAnalysis() {
                 <Typography variant="h5" fontWeight={700} sx={{ mt: 0.5 }}>
                   {results.phq8_estimate} <Typography component="span" variant="body1" color="text.secondary">/ 24</Typography>
                 </Typography>
-                <Typography variant="caption" color="text.secondary">≥ 10 = moderate–severe</Typography>
+                <Typography variant="caption" color="text.secondary">â‰¥ 10 = moderateâ€“severe</Typography>
               </Paper>
             </Grid>
 
@@ -485,7 +485,7 @@ function MultimodalAnalysis() {
               <Paper elevation={0} sx={{ p: 2.5, border: '1px solid', borderColor: 'divider', height: '100%' }}>
                 <Typography variant="caption" color="text.secondary" display="block">CLASSIFICATION</Typography>
                 <Typography variant="h5" fontWeight={700} sx={{ mt: 0.5 }}>
-                  {results.binary_prediction === 1 ? '🔴 Depressed' : '🟢 Not Depressed'}
+                  {results.binary_prediction === 1 ? 'ðŸ”´ Depressed' : 'ðŸŸ¢ Not Depressed'}
                 </Typography>
                 <Chip
                   label={`Model: ${modelUsed}`}
@@ -497,7 +497,7 @@ function MultimodalAnalysis() {
             </Grid>
           </Grid>
 
-          {/* ── Charts row ────────────────────────────────────────────── */}
+          {/* â”€â”€ Charts row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <Grid container spacing={3} sx={{ mb: 3 }}>
 
             {/* Modality contribution radar */}
@@ -561,7 +561,7 @@ function MultimodalAnalysis() {
             </Grid>
           </Grid>
 
-          {/* ── Detailed tabs ─────────────────────────────────────────── */}
+          {/* â”€â”€ Detailed tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <Paper elevation={1} sx={{ mb: 3 }}>
             <Tabs
               value={activeTab}
@@ -575,7 +575,7 @@ function MultimodalAnalysis() {
 
             <Box sx={{ p: 3 }}>
 
-              {/* ── Tab 0: Text Analysis ──────────────────────────────── */}
+              {/* â”€â”€ Tab 0: Text Analysis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {activeTab === 0 && (
                 <Grid container spacing={3}>
                   <Grid item xs={12} md={6}>
@@ -649,7 +649,7 @@ function MultimodalAnalysis() {
                 </Grid>
               )}
 
-              {/* ── Tab 1: Modality Weights ───────────────────────────── */}
+              {/* â”€â”€ Tab 1: Modality Weights â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {activeTab === 1 && (
                 <Grid container spacing={3}>
                   <Grid item xs={12} md={6}>
@@ -682,7 +682,7 @@ function MultimodalAnalysis() {
                 </Grid>
               )}
 
-              {/* ── Tab 2: Audio / Video ──────────────────────────────── */}
+              {/* â”€â”€ Tab 2: Audio / Video â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {activeTab === 2 && (
                 <Grid container spacing={3}>
                   <Grid item xs={12} md={6}>
@@ -737,7 +737,7 @@ function MultimodalAnalysis() {
             </Box>
           </Paper>
 
-          {/* ── Action Plan ───────────────────────────────────────────── */}
+          {/* â”€â”€ Action Plan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           {results.action_plan && (
             <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -804,7 +804,7 @@ function MultimodalAnalysis() {
             </Paper>
           )}
 
-          {/* ── Score Interpretation ──────────────────────────────────── */}
+          {/* â”€â”€ Score Interpretation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <Paper elevation={1} sx={{ p: 2.5, mb: 3 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
               <Warning color="warning" />
@@ -812,11 +812,11 @@ function MultimodalAnalysis() {
             </Box>
             <List dense>
               {[
-                { range: '0–4',  label: 'Minimal depression',  color: '#10b981' },
-                { range: '5–9',  label: 'Mild depression',     color: '#84cc16' },
-                { range: '10–14',label: 'Moderate depression', color: '#f59e0b' },
-                { range: '15–19',label: 'Moderately severe',   color: '#ef4444' },
-                { range: '20–24',label: 'Severe depression',   color: '#7c3aed' },
+                { range: '0â€“4',  label: 'Minimal depression',  color: '#10b981' },
+                { range: '5â€“9',  label: 'Mild depression',     color: '#84cc16' },
+                { range: '10â€“14',label: 'Moderate depression', color: '#f59e0b' },
+                { range: '15â€“19',label: 'Moderately severe',   color: '#ef4444' },
+                { range: '20â€“24',label: 'Severe depression',   color: '#7c3aed' },
               ].map((item) => (
                 <ListItem key={item.range} dense>
                   <ListItemIcon>
@@ -827,7 +827,7 @@ function MultimodalAnalysis() {
                     primaryTypographyProps={{
                       variant: 'body2',
                       fontWeight: results.phq8_estimate >= parseInt(item.range) &&
-                                  results.phq8_estimate <= parseInt(item.range.split('–')[1] || item.range) ? 700 : 400,
+                                  results.phq8_estimate <= parseInt(item.range.split('â€“')[1] || item.range) ? 700 : 400,
                     }}
                   />
                 </ListItem>
@@ -835,7 +835,7 @@ function MultimodalAnalysis() {
             </List>
           </Paper>
 
-          {/* ── Disclaimer ────────────────────────────────────────────── */}
+          {/* â”€â”€ Disclaimer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <Alert severity="info" icon={<Info />} sx={{ mt: 2 }}>
             <Typography variant="body2">
               <strong>Disclaimer:</strong> This tool is for research and informational purposes only.
@@ -847,7 +847,7 @@ function MultimodalAnalysis() {
         </>
       )}
 
-      {/* ── Snackbar ─────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Snackbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Snackbar
         open={!!snack}
         autoHideDuration={3000}
@@ -860,5 +860,3 @@ function MultimodalAnalysis() {
 }
 
 export default MultimodalAnalysis;
-
-// Made with Bob

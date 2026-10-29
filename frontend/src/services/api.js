@@ -6,139 +6,122 @@ import axios from 'axios';
 // In production set REACT_APP_API_URL to the deployed backend URL.
 const API_BASE_URL = process.env.REACT_APP_API_URL || '';
 
-// Create axios instance with default config
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Request interceptor for adding auth token
+// Attach JWT token to every request if available
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error),
 );
 
-// Response interceptor for handling errors
+// Handle 401 â€” remove token and redirect to login
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Handle unauthorized access
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
     return Promise.reject(error);
-  }
+  },
 );
 
-// API Service Methods
 const apiService = {
-  // Health Check
+  // â”€â”€ Health â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   healthCheck: async () => {
-    const response = await api.get('/health');
-    return response.data;
+    const r = await api.get('/health');
+    return r.data;
   },
 
-  // User Management
+  // â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  getHelpline: async () => {
+    const r = await api.get('/api/config/helpline');
+    return r.data;
+  },
+
+  // â”€â”€ User management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   registerUser: async (userData) => {
-    const response = await api.post('/api/users/register', userData);
-    return response.data;
+    const r = await api.post('/api/users/register', userData);
+    return r.data;
   },
-
   getUserProfile: async (userId) => {
-    const response = await api.get(`/api/users/${userId}`);
-    return response.data;
+    const r = await api.get(`/api/users/${userId}`);
+    return r.data;
+  },
+  deleteUserData: async (userId) => {
+    const r = await api.delete(`/api/users/${userId}/data`);
+    return r.data;
   },
 
-  // Mood Tracking
-  logMood: async (moodData) => {
-    const response = await api.post('/api/mood/log', moodData);
-    return response.data;
-  },
-
-  getMoodHistory: async (userId, days = 7) => {
-    const response = await api.get(`/api/mood/history/${userId}`, {
-      params: { days },
-    });
-    return response.data;
-  },
-
-  // Journal
+  // â”€â”€ Journal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   createJournalEntry: async (entryData) => {
-    const response = await api.post('/api/journal/entry', entryData);
-    return response.data;
+    const r = await api.post('/api/journal/entry', entryData);
+    return r.data;
   },
-
   getJournalEntries: async (userId, limit = 10) => {
-    const response = await api.get(`/api/journal/entries/${userId}`, {
-      params: { limit },
-    });
-    return response.data;
+    const r = await api.get(`/api/journal/entries/${userId}`, { params: { limit } });
+    return r.data;
   },
 
-  // AI Analysis
-  analyzeSentiment: async (text) => {
-    const response = await api.post('/api/analyze/sentiment', null, {
-      params: { text },
-    });
-    return response.data;
-  },
-
-  assessRisk: async (userId) => {
-    const response = await api.get(`/api/analyze/risk/${userId}`);
-    return response.data;
-  },
-
-  // Recommendations
-  getRecommendations: async (userId) => {
-    const response = await api.get(`/api/recommendations/${userId}`);
-    return response.data;
-  },
-
-  // Chatbot
+  // â”€â”€ Chatbot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   sendChatMessage: async (message, userId) => {
-    const response = await api.post('/api/chat', null, {
-      params: { message, user_id: userId },
-    });
-    return response.data;
+    // Send as JSON body â€” query params break on special characters like ? & #
+    const r = await api.post('/api/chat', { message, user_id: userId });
+    return r.data;
   },
 
-  // Multimodal Analysis
-  // Sends text (required) + optional audio/video files as multipart form data.
-  // Returns the full analysis result object from the backend.
-  multimodalAnalyze: async (text, audioFile = null, videoFile = null) => {
+  // â”€â”€ Assessment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  /**
+   * POST /api/assess/multimodal
+   * text required; audioFile and videoFile optional File objects.
+   */
+  assess: async (text, audioFile = null, videoFile = null) => {
     const formData = new FormData();
     formData.append('text', text);
-    formData.append('user_id', 'react_user');
+    formData.append('user_id', localStorage.getItem('mindcare_user_id') || 'user123');
     if (audioFile) formData.append('audio_file', audioFile);
     if (videoFile) formData.append('video_file', videoFile);
-
-    // The api instance has 'Content-Type: application/json' as a default header.
-    // We must DELETE it so the browser can set 'multipart/form-data; boundary=...'
-    // automatically — without the boundary FastAPI cannot parse the form fields.
-    const response = await api.post('/api/multimodal/analyze', formData, {
-      headers: { 'Content-Type': undefined },
+    const r = await api.post('/api/assess/multimodal', formData, {
+      headers: { 'Content-Type': undefined }, // let browser set multipart boundary
     });
-    return response.data;
+    return r.data;
   },
 
-  // Text-only shortcut (JSON body — no file uploads needed)
+  getAssessmentHistory: async (userId, page = 1, pageSize = 20) => {
+    const r = await api.get(`/api/assessments/${userId}`, {
+      params: { page, page_size: pageSize },
+    });
+    return r.data;
+  },
+
+  // Legacy text-only shortcut (kept for backward compat)
   multimodalAnalyzeText: async (text) => {
-    const response = await api.post('/api/multimodal/analyze/text', { text });
-    return response.data;
+    const r = await api.post('/api/multimodal/analyze/text', { text });
+    return r.data;
+  },
+
+  // â”€â”€ PHQ-8 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  scorePHQ8: async (answers, userId = 'user123') => {
+    const r = await api.post('/api/phq8/score', { answers, user_id: userId });
+    return r.data;
+  },
+  getPHQ8History: async (userId) => {
+    const r = await api.get(`/api/phq8/history/${userId}`);
+    return r.data;
+  },
+
+  // â”€â”€ Model metrics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  getModelMetrics: async () => {
+    const r = await api.get('/api/model/metrics');
+    return r.data;
   },
 };
 
 export default apiService;
-
-// Made with Bob

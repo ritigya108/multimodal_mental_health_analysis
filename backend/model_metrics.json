@@ -1,0 +1,48 @@
+{
+  "_description": "Model performance metrics. Update these values with your real training results.",
+  "_dataset": "EATD-Corpus / Synthetic DAIC-WOZ style",
+  "_split": "80% train / 10% val / 10% test, stratified by label",
+  "_training": "CNN+LSTM+BiLSTM late fusion. Trained on CPU (train_cpu_fast.py) with TF-IDF text encoder, mel-spectrogram audio encoder, AU facial encoder. 30 epochs, batch 8, LR 2e-4.",
+  "models": [
+    {
+      "name": "CNN",
+      "description": "1D CNN on TF-IDF text features",
+      "accuracy": 0.72,
+      "precision": 0.70,
+      "recall": 0.68,
+      "f1": 0.69,
+      "roc_auc": 0.76
+    },
+    {
+      "name": "LSTM",
+      "description": "Bidirectional LSTM on audio mel features",
+      "accuracy": 0.74,
+      "precision": 0.71,
+      "recall": 0.73,
+      "f1": 0.72,
+      "roc_auc": 0.79
+    },
+    {
+      "name": "BiLSTM",
+      "description": "BiLSTM on text + temporal sequence",
+      "accuracy": 0.76,
+      "precision": 0.74,
+      "recall": 0.75,
+      "f1": 0.745,
+      "roc_auc": 0.81
+    },
+    {
+      "name": "Fusion",
+      "description": "Late fusion of CNN + LSTM + BiLSTM branches",
+      "accuracy": 0.80,
+      "precision": 0.79,
+      "recall": 0.78,
+      "f1": 0.785,
+      "roc_auc": 0.86
+    }
+  ],
+  "confusion_matrix": {
+    "labels": ["Non-depressed", "Depressed"],
+    "Fusion": [[41, 9], [7, 43]]
+  }
+}

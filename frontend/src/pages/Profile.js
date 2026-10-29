@@ -83,7 +83,7 @@ function Profile() {
   return (
     <Box>
       <Typography variant="h4" sx={{ mb: 3, fontWeight: 700 }}>
-        My Profile 👤
+        My Profile ðŸ‘¤
       </Typography>
 
       <Grid container spacing={3}>
@@ -168,7 +168,7 @@ function Profile() {
           <Card sx={{ mt: 2 }}>
             <CardContent>
               <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
-                📊 Your Stats
+                ðŸ“Š Your Stats
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -199,13 +199,13 @@ function Profile() {
                   <Typography variant="body2" color="text.secondary">
                     Current Streak
                   </Typography>
-                  <Chip label={`${stats.currentStreak} days 🔥`} size="small" color="primary" />
+                  <Chip label={`${stats.currentStreak} days ðŸ”¥`} size="small" color="primary" />
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Typography variant="body2" color="text.secondary">
                     Longest Streak
                   </Typography>
-                  <Chip label={`${stats.longestStreak} days 🏆`} size="small" color="success" />
+                  <Chip label={`${stats.longestStreak} days ðŸ†`} size="small" color="success" />
                 </Box>
               </Box>
             </CardContent>
@@ -495,5 +495,3 @@ function Profile() {
 }
 
 export default Profile;
-
-// Made with Bob

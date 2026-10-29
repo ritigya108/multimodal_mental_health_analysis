@@ -52,7 +52,7 @@ function MoodTracker() {
       
       setSnackbar({
         open: true,
-        message: 'Mood logged successfully! 🎉',
+        message: 'Mood logged successfully! ðŸŽ‰',
         severity: 'success',
       });
       
@@ -153,7 +153,7 @@ function MoodTracker() {
           <Card>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                💡 Mood Tracking Tips
+                ðŸ’¡ Mood Tracking Tips
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Box>
@@ -262,5 +262,3 @@ function MoodTracker() {
 }
 
 export default MoodTracker;
-
-// Made with Bob
