@@ -1,0 +1,49 @@
+{
+  "_description": "⚠ PLACEHOLDER — replace ALL numeric values with your real training results before submission.",
+  "_dataset": "EATD-Corpus (Shen et al., ICASSP 2022) — bimodal: audio + Mandarin text, SDS-derived labels",
+  "_split": "80% train / 20% val, stratified by label (EATD ~162 participants, class-imbalanced)",
+  "_training": "CNN + LSTM + BiLSTM late fusion. BERT text encoder (last-2 layers fine-tuned), mel-spectrogram audio CNN. 30 epochs, batch 8, LR 2e-4.",
+  "_how_to_update": "After running `python backend/train.py` or `python backend/train_cpu_fast.py`, copy the metrics from `backend/checkpoints/eatd_fast/final_metrics.json` here.",
+  "models": [
+    {
+      "name": "CNN (audio branch)",
+      "description": "2D CNN on mel-spectrograms — audio-only baseline",
+      "accuracy": null,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "roc_auc": null
+    },
+    {
+      "name": "LSTM (text branch)",
+      "description": "Unidirectional LSTM on TF-IDF / word embeddings — text-only baseline",
+      "accuracy": null,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "roc_auc": null
+    },
+    {
+      "name": "BiLSTM (text branch)",
+      "description": "Bidirectional LSTM on text token sequence — text-only baseline",
+      "accuracy": null,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "roc_auc": null
+    },
+    {
+      "name": "Fusion (audio + text)",
+      "description": "Late fusion of CNN + LSTM + BiLSTM branches — bimodal result",
+      "accuracy": null,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "roc_auc": null
+    }
+  ],
+  "confusion_matrix": {
+    "labels": ["Non-depressed", "Depressed"],
+    "Fusion": [[null, null], [null, null]]
+  }
+}
