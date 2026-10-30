@@ -90,5 +90,5 @@ mental_health.db
 backend/data/
 data/
 
-# Streamlit — only ignore secrets, not config (config.toml needed for Streamlit Cloud)
-.streamlit/secrets.toml
+# Streamlit app (removed — project uses React frontend only)
+streamlit-app/

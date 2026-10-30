@@ -420,6 +420,7 @@ function Dashboard() {
   const [latestResult, setLatestResult] = useState(null);
   const [assessments, setAssessments]   = useState([]);
   const [page, setPage]                 = useState(0);
+  const [backendOnline, setBackendOnline] = useState(null); // null=checking, true, false
 
   // ── Data loading ────────────────────────────────────────────────────────────
   // SWAP POINT: replace the body of loadDashboard() with a real apiService call.
@@ -451,6 +452,13 @@ function Dashboard() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // ── Backend health check ─────────────────────────────────────────────────────
+  useEffect(() => {
+    fetch('/health')
+      .then((r) => setBackendOnline(r.ok))
+      .catch(() => setBackendOnline(false));
   }, []);
 
   useEffect(() => { loadDashboard(); }, [loadDashboard]);
@@ -525,6 +533,32 @@ function Dashboard() {
           Start new assessment
         </Button>
       </Box>
+
+      {/* ── Backend offline banner ──────────────────────────────────────── */}
+      {backendOnline === false && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2, borderRadius: 2 }}
+          action={
+            <Button
+              size="small"
+              color="inherit"
+              onClick={() => {
+                setBackendOnline(null);
+                fetch('/health').then((r) => setBackendOnline(r.ok)).catch(() => setBackendOnline(false));
+              }}
+            >
+              Retry
+            </Button>
+          }
+        >
+          <strong>Backend server is not running.</strong> Start it with:{' '}
+          <code style={{ backgroundColor: '#fee2e2', padding: '1px 6px', borderRadius: 4 }}>
+            cd backend &amp;&amp; python main.py
+          </code>{' '}
+          — then click Retry. Assessments will not work until it is online.
+        </Alert>
+      )}
 
       {/* ── Error banner ────────────────────────────────────────────────── */}
       {error && <ErrorState onRetry={loadDashboard} />}

@@ -513,10 +513,23 @@ function Assessment() {
       const existing = JSON.parse(sessionStorage.getItem('mindcare_assessments') || '[]');
       sessionStorage.setItem('mindcare_assessments', JSON.stringify([res, ...existing]));
     } catch (e) {
-      setApiError(
-        e?.response?.data?.detail ||
-        'Analysis failed. Check that the backend is running (python backend/main.py).'
-      );
+      if (!e.response) {
+        // Network error — backend is not reachable at all
+        setApiError(
+          'Cannot connect to the backend server. Make sure it is running:\n' +
+          '  cd backend  →  python main.py\n' +
+          'The server should be on http://localhost:8000'
+        );
+      } else {
+        // Backend returned an error response — show its message
+        const detail = e.response.data?.detail;
+        const msg = typeof detail === 'string'
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map((d) => d.msg || JSON.stringify(d)).join('; ')
+            : `Server error ${e.response.status}`;
+        setApiError(msg);
+      }
     } finally {
       setSubmitting(false);
     }

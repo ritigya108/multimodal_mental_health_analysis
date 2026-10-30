@@ -2,19 +2,29 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
 python-dotenv==1.0.0
-sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
+python-multipart==0.0.6
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.6
-transformers==4.35.2
-torch==2.1.1
+sqlalchemy==2.0.23
+numpy==1.26.2
 scikit-learn==1.3.2
 pandas==2.1.3
-numpy==1.26.2
 nltk==3.8.1
 textblob==0.17.1
 vaderSentiment==3.3.2
 # Testing
 pytest>=7.4.0
 httpx>=0.25.0
+
+# ── Optional deps ──────────────────────────────────────────────────────────────
+# librosa — enables real audio feature extraction (MFCC, pitch, energy).
+# Without it the backend silently falls back to zero audio features.
+librosa>=0.10.1
+
+# Heavy ML — only needed if you have a trained checkpoint (backend/checkpoints/).
+# The backend runs in heuristic (rule-based) mode without them.
+#
+# pip install torch==2.1.1 transformers==4.35.2
+#
+# For PostgreSQL instead of SQLite:
+# pip install psycopg2-binary==2.9.9

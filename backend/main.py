@@ -11,6 +11,11 @@ _BACKEND_DIR = Path(__file__).resolve().parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
+# ── Load .env from backend/ or repo root (whichever exists first) ─────────────
+from dotenv import load_dotenv as _load_dotenv
+_load_dotenv(_BACKEND_DIR / ".env")                        # backend/.env
+_load_dotenv(_BACKEND_DIR.parent / ".env", override=False) # repo-root .env (fallback)
+
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
