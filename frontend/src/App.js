@@ -8,7 +8,6 @@ import Box from '@mui/material/Box';
 import Dashboard from './pages/Dashboard';
 import Assessment from './pages/Assessment';
 import PHQ8 from './pages/PHQ8';
-import ModelPerformance from './pages/ModelPerformance';
 import Settings from './pages/Settings';
 import ReportDetail from './pages/ReportDetail';
 
@@ -138,7 +137,6 @@ function App() {
                   <Route path="/assess" element={<Assessment />} />
                   <Route path="/assess/report/:id" element={<ReportDetail />} />
                   <Route path="/phq8" element={<PHQ8 />} />
-                  <Route path="/model" element={<ModelPerformance />} />
                   <Route path="/settings" element={<Settings />} />
                 </Routes>
               </Box>

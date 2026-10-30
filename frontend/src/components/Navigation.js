@@ -22,7 +22,6 @@ import {
 import {
   Dashboard as DashboardIcon,
   Psychology as AssessIcon,
-  Assessment as MetricsIcon,
   Quiz as PHQ8Icon,
   Settings as SettingsIcon,
   ChevronLeft as CollapseIcon,
@@ -35,11 +34,10 @@ const DRAWER_WIDTH_FULL = 240;
 const DRAWER_WIDTH_MINI = 64;
 
 const NAV_ITEMS = [
-  { text: 'Overview',    icon: <DashboardIcon />, path: '/dashboard', group: 'main' },
-  { text: 'Assessment',  icon: <AssessIcon />,    path: '/assess',    group: 'main' },
-  { text: 'PHQ-8',       icon: <PHQ8Icon />,      path: '/phq8',      group: 'main' },
-  { text: 'Model Performance', icon: <MetricsIcon />, path: '/model', group: 'tools' },
-  { text: 'Settings',    icon: <SettingsIcon />,  path: '/settings',  group: 'account' },
+  { text: 'Overview',   icon: <DashboardIcon />, path: '/dashboard', group: 'main' },
+  { text: 'Assessment', icon: <AssessIcon />,    path: '/assess',    group: 'main' },
+  { text: 'PHQ-8',      icon: <PHQ8Icon />,      path: '/phq8',      group: 'main' },
+  { text: 'Settings',   icon: <SettingsIcon />,  path: '/settings',  group: 'account' },
 ];
 
 function Navigation() {
