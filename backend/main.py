@@ -1,15 +1,17 @@
 import os
 import sys
+import json
+import tempfile
 from pathlib import Path
 
-# â”€â”€ Make sure the backend directory is on sys.path so that
+# ── Make sure the backend directory is on sys.path so that
 #    `from app_config import ...` works regardless of the working
 #    directory the user launched from (e.g. repo root vs backend/).
 _BACKEND_DIR = Path(__file__).resolve().parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
@@ -17,6 +19,8 @@ from datetime import datetime
 import uvicorn
 import numpy as np
 import io
+
+from auth import router as auth_router, get_user_id
 
 from app_config import (
     CRISIS_HELPLINE_NUMBER,
@@ -47,6 +51,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Auth router — provides POST /auth/token
+app.include_router(auth_router)
+
 
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Pydantic schemas
@@ -502,101 +511,160 @@ async def delete_user_data(user_id: str):
     }
 
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# Model metrics (served from JSON file)
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-from pathlib import Path
-import json
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Model metrics endpoint
+# ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/api/model/metrics")
 async def get_model_metrics():
-    """Return model performance metrics loaded from backend/model_metrics.json."""
-    metrics_path = Path(__file__).parent / "model_metrics.json"
-    if not metrics_path.exists():
-        raise HTTPException(status_code=404, detail="model_metrics.json not found in backend/.")
-    with open(metrics_path) as f:
-        return json.load(f)
+    """
+    Return model performance metrics.
+
+    Priority:
+      1. ml/results/metrics.json  (canonical, version-controlled)
+      2. backend/model_metrics.json  (legacy fallback)
+    """
+    _candidates = [
+        Path(__file__).parent.parent / "ml" / "results" / "metrics.json",
+        Path(__file__).parent / "model_metrics.json",
+    ]
+    for p in _candidates:
+        if p.exists():
+            with open(p, encoding="utf-8") as f:
+                return json.load(f)
+    raise HTTPException(status_code=404, detail="metrics.json not found. Run training first.")
 
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# Multimodal Analysis (main endpoint â€” updated path + richer response)
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─────────────────────────────────────────────────────────────────────────────
+# Audio feature extraction helpers
+# ─────────────────────────────────────────────────────────────────────────────
 
-_CKPT_PRIORITY = [
-    Path(__file__).parent / "checkpoints" / "eatd_fast" / "best.pt",
-    Path(__file__).parent / "checkpoints" / "eatd"      / "best.pt",
-    Path(__file__).parent / "checkpoints" / "synthetic" / "best.pt",
-]
-MODEL_CHECKPOINT = next((p for p in _CKPT_PRIORITY if p.exists()), _CKPT_PRIORITY[-1])
+_ALLOWED_AUDIO_TYPES = {
+    "audio/wav", "audio/x-wav", "audio/wave",
+    "audio/mpeg", "audio/mp3",
+    "audio/webm", "audio/ogg",
+    "application/octet-stream",   # some browsers send this for .wav
+}
 
-_model = None
-_tfidf = None
+_ALLOWED_AUDIO_EXTENSIONS = {".wav", ".mp3", ".webm", ".ogg", ".m4a"}
 
 
-def _load_model():
-    global _model, _tfidf
-    if _model is not None:
-        return _model, _tfidf
+def _validate_audio_upload(upload: UploadFile, raw_bytes: bytes) -> None:
+    """Raise HTTPException for invalid audio file type or size."""
+    ext = Path(upload.filename or "").suffix.lower()
+    ct  = (upload.content_type or "").lower().split(";")[0].strip()
 
-    ckpt_path = next((p for p in _CKPT_PRIORITY if p.exists()), None)
-    if ckpt_path is None:
-        return None, None
+    if ct not in _ALLOWED_AUDIO_TYPES and ext not in _ALLOWED_AUDIO_EXTENSIONS:
+        raise HTTPException(
+            status_code=415,
+            detail=(
+                f"Unsupported media type '{ct}' (extension '{ext}'). "
+                f"Accepted types: WAV, MP3, WebM, OGG."
+            ),
+        )
+    if len(raw_bytes) > MAX_AUDIO_SIZE_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Audio file exceeds the {MAX_AUDIO_SIZE_MB} MB size limit.",
+        )
 
+
+def _extract_audio_features(audio_bytes: bytes) -> dict:
+    """
+    Extract a rich set of audio features using librosa.
+
+    Returns a dict with:
+      mfcc_mean, mfcc_std  — MFCC-40 statistics
+      pitch_mean, pitch_std — F0 statistics (pyin)
+      energy_mean          — RMS energy mean
+      speech_rate          — voiced frames / total frames
+      pause_ratio          — fraction of silence frames
+      depression_proxy     — heuristic [0-1] score from audio alone
+    """
+    try:
+        import librosa
+        y, sr = librosa.load(io.BytesIO(audio_bytes), sr=16000, duration=60)
+
+        # MFCC (40 coefficients)
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
+        mfcc_mean = float(np.mean(mfcc))
+        mfcc_std  = float(np.std(mfcc))
+
+        # Pitch (F0) via pyin
+        try:
+            f0, voiced_flag, _ = librosa.pyin(y, fmin=50, fmax=500, sr=sr)
+            voiced = f0[voiced_flag]
+            pitch_mean = float(np.mean(voiced)) if len(voiced) > 0 else 0.0
+            pitch_std  = float(np.std(voiced))  if len(voiced) > 0 else 0.0
+            speech_rate = float(np.mean(voiced_flag)) if len(voiced_flag) > 0 else 0.0
+        except Exception:
+            pitch_mean  = 0.0
+            pitch_std   = 0.0
+            speech_rate = 0.0
+
+        # RMS energy
+        rms = librosa.feature.rms(y=y)[0]
+        energy_mean = float(np.mean(rms))
+
+        # Pause ratio — frames below 10% of max RMS
+        silence_threshold = 0.10 * float(np.max(rms)) if np.max(rms) > 0 else 0
+        pause_ratio = float(np.mean(rms < silence_threshold))
+
+        # Simple depression proxy from audio:
+        # Low F0 range, low energy, high pause ratio are associated with depression.
+        dep_audio = 0.0
+        if pitch_std < 20:   dep_audio += 0.2   # flat prosody
+        if energy_mean < 0.02: dep_audio += 0.2  # low energy
+        if pause_ratio > 0.4:  dep_audio += 0.2  # many pauses
+        if speech_rate < 0.3:  dep_audio += 0.2  # slow speech
+        dep_audio = min(dep_audio, 0.8)
+
+        return {
+            "mfcc_mean":       round(mfcc_mean, 4),
+            "mfcc_std":        round(mfcc_std, 4),
+            "pitch_mean":      round(pitch_mean, 2),
+            "pitch_std":       round(pitch_std, 2),
+            "energy_mean":     round(energy_mean, 6),
+            "speech_rate":     round(speech_rate, 3),
+            "pause_ratio":     round(pause_ratio, 3),
+            "depression_proxy": round(dep_audio, 3),
+        }
+    except Exception as exc:
+        print(f"[audio_features] Extraction failed: {exc}")
+        return {
+            "mfcc_mean": 0.0, "mfcc_std": 0.0,
+            "pitch_mean": 0.0, "pitch_std": 0.0,
+            "energy_mean": 0.0, "speech_rate": 0.0,
+            "pause_ratio": 0.0, "depression_proxy": 0.0,
+        }
+
+
+def _mel_tensor_from_bytes(audio_bytes: bytes):
+    """Return a (1, 1, 128, 128) torch tensor from raw audio bytes."""
     try:
         import torch
-        import numpy as _np
-        from sklearn.feature_extraction.text import TfidfVectorizer, TfidfTransformer as _TT
-        import scipy.sparse as _sp
-
-        ckpt = torch.load(str(ckpt_path), map_location="cpu", weights_only=False)
-        has_tfidf = "tfidf_vocab" in ckpt
-
-        if has_tfidf:
-            from train_cpu_fast import FastMultimodalModel
-            tfidf_dim = ckpt.get("args", {}).get("tfidf_dim", 500)
-            m = FastMultimodalModel(tfidf_dim=tfidf_dim)
-            state = ckpt["model_state"]
-            key_map = {"audio.": "audio_enc.", "text.": "text_enc.", "facial.": "facial_enc."}
-            remapped = {}
-            for k, v in state.items():
-                new_k = k
-                for old, new in key_map.items():
-                    if k.startswith(old):
-                        new_k = new + k[len(old):]
-                        break
-                remapped[new_k] = v
-            m.load_state_dict(remapped, strict=False)
-            m.eval()
-
-            idf_arr = _np.array(ckpt["tfidf_idf"], dtype=_np.float64)
-            tv = TfidfVectorizer(max_features=len(ckpt["tfidf_vocab"]),
-                                 sublinear_tf=True, ngram_range=(1, 2))
-            tv.vocabulary_ = ckpt["tfidf_vocab"]
-            tv.idf_        = idf_arr
-            _tt = _TT(sublinear_tf=True)
-            _tt.idf_ = idf_arr
-            n = len(idf_arr)
-            _tt._idf_diag = _sp.diags(idf_arr, offsets=0, shape=(n, n), format="csr", dtype=_np.float64)
-            tv._tfidf = _tt
-            _tfidf = tv
-            _model = m
+        import librosa as _lr
+        N_MELS = 128
+        y, sr = _lr.load(io.BytesIO(audio_bytes), sr=16000, duration=60)
+        mel = _lr.feature.melspectrogram(y=y, sr=sr, n_mels=N_MELS)
+        mel = _lr.power_to_db(mel, ref=np.max)
+        mel = (mel - mel.min()) / (mel.max() - mel.min() + 1e-8)
+        T = 128
+        if mel.shape[1] >= T:
+            mel = mel[:, :T]
         else:
-            from multimodal_model import build_model
-            saved_args = ckpt.get("args", {})
-            m = build_model(task=saved_args.get("task", "classification"),
-                            embed_dim=saved_args.get("embed_dim", 256),
-                            dropout=0.0)
-            m.load_state_dict(ckpt["model_state"])
-            m.eval()
-            _model = m
-            _tfidf = None
+            mel = np.pad(mel, ((0, 0), (0, T - mel.shape[1])))
+        return torch.tensor(mel, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+    except Exception:
+        import torch
+        return torch.zeros(1, 1, 128, 128)
 
-        return _model, _tfidf
-    except Exception as e:
-        print(f"[multimodal] Model load failed (heuristic fallback): {e}")
-        return None, None
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Heuristic text analysis helpers
+# ─────────────────────────────────────────────────────────────────────────────
 
 ACTION_PLAN_MAP = {
     "critical": {
@@ -628,7 +696,7 @@ ACTION_PLAN_MAP = {
                 "category": "Professional Support",
                 "priority": "high",
                 "steps": [
-                    "Schedule a session with a therapist or counsellor within 3â€“5 days.",
+                    "Schedule a session with a therapist or counsellor within 3-5 days.",
                     f"Contact {CRISIS_HELPLINE_NAME}: {CRISIS_HELPLINE_NUMBER} if you need to talk now.",
                 ],
             },
@@ -636,7 +704,7 @@ ACTION_PLAN_MAP = {
                 "category": "Sleep and Body",
                 "priority": "high",
                 "steps": [
-                    "Set a fixed sleep and wake time â€” irregular sleep worsens depression.",
+                    "Set a fixed sleep and wake time -- irregular sleep worsens depression.",
                     "Even a 20-minute brisk walk daily raises serotonin.",
                 ],
             },
@@ -658,7 +726,7 @@ ACTION_PLAN_MAP = {
                 "priority": "medium",
                 "steps": [
                     "Walk or do light exercise for at least 20 minutes daily.",
-                    "Prioritise 7â€“8 hours of sleep consistently.",
+                    "Prioritise 7-8 hours of sleep consistently.",
                 ],
             },
         ],
@@ -679,44 +747,21 @@ ACTION_PLAN_MAP = {
 }
 
 
-def _build_key_findings(text: str, dep_score: float, has_audio: bool) -> List[str]:
-    """Generate 3 plain-language key findings from available signals."""
-    words = text.lower().split()
-    word_count = len(words)
-    first_person = sum(1 for w in words if w in {"i", "me", "my", "myself"})
-    fp_ratio = first_person / max(word_count, 1)
+def _score_text_heuristic(text: str) -> dict:
+    """
+    Return a depression-score dict for a single text fragment.
 
-    findings = []
-
-    if dep_score >= 0.60:
-        findings.append("Strong negative affect language detected in the transcript.")
-    elif dep_score >= 0.35:
-        findings.append("Moderate negative affect language observed in the transcript.")
-    else:
-        findings.append("Transcript sentiment is predominantly neutral to positive.")
-
-    if fp_ratio > 0.10:
-        findings.append(
-            f"Elevated first-person pronoun use ({fp_ratio:.0%}) — a known linguistic marker of depression."
-        )
-    else:
-        findings.append("First-person pronoun use is within typical range.")
-
-    if has_audio:
-        findings.append("Audio modality was included; speech features contributed to the overall score.")
-    else:
-        findings.append("Analysis was text-only. Add audio for a bimodal assessment.")
-
-    return findings[:3]
-
-
-def _heuristic_analysis(text: str, has_audio: bool, user_id: str = "anonymous") -> dict:
+    Uses Chinese-aware word list matching (common depressive characters)
+    plus a universal English/pinyin fallback.
+    Note: For production, replace with jieba tokenisation + a trained
+    Chinese sentiment lexicon (e.g., DUTIR or BosonNLP sentiment dict).
+    """
     text_lower = text.lower()
     words = text_lower.split()
-    word_count = len(words)
+    word_count = max(len(words), 1)
 
     first_person = sum(1 for w in words if w in {"i", "me", "my", "myself", "mine"})
-    first_person_ratio = first_person / max(word_count, 1)
+    first_person_ratio = first_person / word_count
 
     neg_words = {
         "sad", "hopeless", "worthless", "tired", "exhausted", "empty",
@@ -724,253 +769,411 @@ def _heuristic_analysis(text: str, has_audio: bool, user_id: str = "anonymous") 
         "bad", "terrible", "awful", "miserable", "hate", "fear", "cry",
         "crying", "helpless", "desperate", "dark", "difficult", "hard",
         "can't", "cannot", "never", "nothing", "nobody", "no one",
+        # Common Mandarin transliterations / pinyin
+        "beishang", "juewang", "wuliao", "tongku", "haipa",
     }
     pos_words = {
         "happy", "good", "great", "joy", "excited", "grateful", "wonderful",
         "love", "amazing", "excellent", "peaceful", "calm", "content",
         "motivated", "hopeful", "positive", "better", "improved",
+        "kaixin", "gaoxing", "xingfu",
     }
 
-    neg_count = sum(1 for w in words if w in neg_words)
-    pos_count = sum(1 for w in words if w in pos_words)
-    neg_ratio  = neg_count / max(word_count, 1)
-    pos_ratio  = pos_count / max(word_count, 1)
+    # Chinese character-level depression markers (appear in Mandarin text)
+    chinese_neg_chars = ["悲", "哭", "绝望", "无助", "孤独", "痛苦", "焦虑", "压力", "失眠"]
+    chinese_pos_chars = ["快乐", "开心", "幸福", "高兴", "满足", "平静"]
+    cn_neg = sum(1 for ch in chinese_neg_chars if ch in text)
+    cn_pos = sum(1 for ch in chinese_pos_chars if ch in text)
+
+    neg_count = sum(1 for w in words if w in neg_words) + cn_neg
+    pos_count = sum(1 for w in words if w in pos_words) + cn_pos
+    neg_ratio = neg_count / word_count
+    pos_ratio = pos_count / word_count
 
     crisis_high = ["suicide", "kill myself", "end my life", "want to die",
-                   "no reason to live", "better off dead", "harm myself"]
-    crisis_mid = ["hopeless", "worthless", "can't go on", "give up", "unbearable"]
+                   "no reason to live", "better off dead", "harm myself",
+                   "自杀", "不想活", "结束生命"]
+    crisis_mid  = ["hopeless", "worthless", "can't go on", "give up",
+                   "unbearable", "绝望", "撑不下去"]
     has_crisis_high = any(kw in text_lower for kw in crisis_high)
     has_crisis_mid  = any(kw in text_lower for kw in crisis_mid)
 
-    depression_score = 0.0
-    depression_score += min(first_person_ratio * 2.0, 0.3)
-    depression_score += min(neg_ratio * 3.0, 0.40)
-    depression_score -= min(pos_ratio * 2.0, 0.20)
-    if has_crisis_high:
-        depression_score += 0.60
-    elif has_crisis_mid:
-        depression_score += 0.30
-    depression_score = float(max(0.0, min(1.0, depression_score)))
+    score = 0.0
+    score += min(first_person_ratio * 2.0, 0.3)
+    score += min(neg_ratio * 3.0, 0.40)
+    score -= min(pos_ratio * 2.0, 0.20)
+    if has_crisis_high: score += 0.60
+    elif has_crisis_mid: score += 0.30
+    score = float(max(0.0, min(1.0, score)))
 
-    audio_conf = 0.55 if has_audio else 0.0
-    text_conf  = 0.85
+    return {
+        "depression_score": score,
+        "neg_ratio": round(neg_ratio, 3),
+        "pos_ratio": round(pos_ratio, 3),
+        "first_person_ratio": round(first_person_ratio, 3),
+        "crisis_high": has_crisis_high,
+        "crisis_mid": has_crisis_mid,
+        "word_count": word_count,
+    }
 
-    weights_sum = text_conf + audio_conf
-    if weights_sum > 0:
-        fused_score = (
-            depression_score * text_conf +
-            depression_score * 0.9 * audio_conf
-        ) / weights_sum
+
+def _build_key_findings(scores: list, audio_feats: Optional[dict], has_audio: bool) -> list:
+    """Generate up to 3 plain-language key findings from per-question scores + audio."""
+    findings = []
+    avg = float(np.mean([s["depression_score"] for s in scores]))
+
+    if avg >= 0.60:
+        findings.append("Strong negative affect language detected across the three question responses.")
+    elif avg >= 0.35:
+        findings.append("Moderate negative affect language observed in the question responses.")
     else:
-        fused_score = depression_score
+        findings.append("Question responses show predominantly neutral to positive sentiment.")
 
-    phq8_estimate = round(fused_score * 24, 1)
-
-    if has_crisis_high or fused_score >= 0.70:
-        risk_level = "critical"
-    elif fused_score >= 0.50:
-        risk_level = "high"
-    elif fused_score >= 0.30:
-        risk_level = "moderate"
+    fp = float(np.mean([s["first_person_ratio"] for s in scores]))
+    if fp > 0.10:
+        findings.append(
+            f"Elevated first-person pronoun use ({fp:.0%}) across responses -- a known linguistic marker of depression."
+        )
     else:
-        risk_level = "low"
+        findings.append("First-person pronoun use is within typical range across all questions.")
 
-    # Modality contributions (normalised to %)
-    mod_total = text_conf + audio_conf
-    modality_contributions = {
-        "text":  round(text_conf  / max(mod_total, 1) * 100, 1),
-        "audio": round(audio_conf / max(mod_total, 1) * 100, 1),
-    }
-    per_modality_confidence = {
-        "text":  round(text_conf,  3),
-        "audio": round(audio_conf, 3) if has_audio else None,
-    }
+    if has_audio and audio_feats:
+        proxy = audio_feats.get("depression_proxy", 0)
+        if proxy >= 0.4:
+            findings.append(
+                f"Audio prosody shows reduced expressiveness (pause ratio {audio_feats.get('pause_ratio', 0):.0%}, "
+                f"speech rate {audio_feats.get('speech_rate', 0):.0%}) -- consistent with depressive presentation."
+            )
+        else:
+            findings.append("Audio prosody features are within a normal range.")
+    else:
+        findings.append("No audio provided. Upload audio for bimodal analysis.")
 
-    plan = ACTION_PLAN_MAP[risk_level]
-    flat_recs = [step for cat in plan["categories"] for step in cat["steps"]]
-    key_findings = _build_key_findings(text, fused_score, has_audio)
+    return findings[:3]
 
-    # Attention-style word weights (simple neg/pos word highlighting)
-    word_weights = {}
-    for w in words:
-        if w in neg_words:
-            word_weights[w] = -1.0
-        elif w in pos_words:
-            word_weights[w] = 1.0
 
-    input_type = "audio+text" if has_audio else "text"
+# ─────────────────────────────────────────────────────────────────────────────
+# Model loading
+# ─────────────────────────────────────────────────────────────────────────────
 
-    result = {
-        "risk_level": risk_level,
-        "score": round(fused_score, 3),
-        "confidence": round(text_conf, 3),
-        "phq8_estimate": phq8_estimate,
-        "binary_prediction": int(fused_score >= 0.40),
-        "modality_contributions": modality_contributions,
-        "per_modality_confidence": per_modality_confidence,
-        "key_findings": key_findings,
-        "linguistic_features": {
-            "word_count": word_count,
-            "first_person_ratio": round(first_person_ratio, 3),
-            "negative_word_ratio": round(neg_ratio, 3),
-            "positive_word_ratio": round(pos_ratio, 3),
-        },
-        "word_weights": word_weights,
-        "crisis_flags": {
-            "high_risk_detected": has_crisis_high,
-            "medium_risk_detected": has_crisis_mid,
-        },
-        "recommendations": flat_recs,
-        "action_plan": plan,
-        "model_used": "heuristic",
-        "demo_mode": True,
-        "input_type": input_type,
-        "timestamp": datetime.now().isoformat(),
-        "user_id": user_id,
-        "note": (
-            "Results are based on linguistic analysis only. "
-            "Connect a trained model checkpoint for full multimodal inference."
-        ),
-    }
-    _assessments.append(result)
-    return result
+_CKPT_PRIORITY = [
+    Path(__file__).parent / "checkpoints" / "eatd_fast" / "best.pt",
+    Path(__file__).parent / "checkpoints" / "eatd"      / "best.pt",
+    Path(__file__).parent / "checkpoints" / "synthetic" / "best.pt",
+]
 
+_model  = None
+_tfidf  = None
+
+
+def _load_model():
+    global _model, _tfidf
+    if _model is not None:
+        return _model, _tfidf
+
+    ckpt_path = next((p for p in _CKPT_PRIORITY if p.exists()), None)
+    if ckpt_path is None:
+        return None, None
+
+    try:
+        import torch
+        import numpy as _np
+        from sklearn.feature_extraction.text import TfidfVectorizer, TfidfTransformer as _TT
+        import scipy.sparse as _sp
+
+        ckpt = torch.load(str(ckpt_path), map_location="cpu", weights_only=False)
+        has_tfidf = "tfidf_vocab" in ckpt
+
+        if has_tfidf:
+            from train_cpu_fast import FastMultimodalModel
+            tfidf_dim = ckpt.get("args", {}).get("tfidf_dim", 500)
+            m = FastMultimodalModel(tfidf_dim=tfidf_dim)
+            state = ckpt["model_state"]
+            key_map = {"audio.": "audio_enc.", "text.": "text_enc.", "facial.": "facial_enc."}
+            remapped = {}
+            for k, v in state.items():
+                new_k = k
+                for old, new_k_prefix in key_map.items():
+                    if k.startswith(old):
+                        new_k = new_k_prefix + k[len(old):]
+                        break
+                remapped[new_k] = v
+            m.load_state_dict(remapped, strict=False)
+            m.eval()
+
+            idf_arr = _np.array(ckpt["tfidf_idf"], dtype=_np.float64)
+            tv = TfidfVectorizer(max_features=len(ckpt["tfidf_vocab"]),
+                                 sublinear_tf=True, ngram_range=(1, 2))
+            tv.vocabulary_ = ckpt["tfidf_vocab"]
+            tv.idf_        = idf_arr
+            _tt = _TT(sublinear_tf=True)
+            _tt.idf_ = idf_arr
+            n = len(idf_arr)
+            _tt._idf_diag = _sp.diags(idf_arr, offsets=0, shape=(n, n), format="csr", dtype=_np.float64)
+            tv._tfidf = _tt
+            _tfidf = tv
+            _model = m
+        else:
+            from multimodal_model import build_model
+            saved_args = ckpt.get("args", {})
+            m = build_model(task=saved_args.get("task", "classification"),
+                            embed_dim=saved_args.get("embed_dim", 256),
+                            dropout=0.0)
+            m.load_state_dict(ckpt["model_state"])
+            m.eval()
+            _model = m
+            _tfidf = None
+
+        return _model, _tfidf
+    except Exception as exc:
+        print(f"[multimodal] Model load failed (heuristic fallback): {exc}")
+        return None, None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# POST /api/assess/multimodal  — EATD three-question endpoint
+# ─────────────────────────────────────────────────────────────────────────────
 
 class MultimodalTextRequest(BaseModel):
     text: str
     user_id: Optional[str] = "anonymous"
 
 
+EATD_QUESTIONS = {
+    "positive": "Describe a positive memory or a time you felt happy.",
+    "neutral":  "Describe your daily routine.",
+    "negative": "Describe a difficult or stressful experience.",
+}
+
+
 @app.post("/api/assess/multimodal")
 async def assess_multimodal(
-    text: str = Form(..., description="Interview/journal transcript text"),
-    user_id: str = Form("anonymous"),
-    audio_file: Optional[UploadFile] = File(None),
+    # Per-question text (all required; minimum one non-empty)
+    positive_text: str = Form(""),
+    neutral_text:  str = Form(""),
+    negative_text: str = Form(""),
+    # Per-question audio (all optional)
+    positive_audio: Optional[UploadFile] = File(None),
+    neutral_audio:  Optional[UploadFile] = File(None),
+    negative_audio: Optional[UploadFile] = File(None),
+    # Caller identity (resolved from JWT when JWT_AUTH_REQUIRED=true)
+    user_id: str = Depends(get_user_id),
 ):
     """
-    Primary bimodal assessment endpoint.
+    EATD-Corpus three-question bimodal assessment endpoint.
 
-    Accepts text (required) + optional audio (.wav/.mp3).
-    Returns: risk_level, score, confidence, modality_contributions,
-             key_findings, timestamp.
-    Falls back to heuristic mode with demo_mode=true if no checkpoint is available.
+    Accepts text + optional audio for each of the three EATD emotional
+    questions (positive, neutral, negative).  Returns a fused risk assessment.
+
+    Audio files: WAV / MP3 / WebM / OGG, max 50 MB each.
+    Text: free-form; Mandarin and English both accepted.
+    Model fallback: returns demo_mode=true if no trained checkpoint is found.
     """
-    if not text or not text.strip():
-        raise HTTPException(status_code=422, detail="'text' field is required.")
+    # ── Validate at least one text field is non-empty ──────────────────────
+    texts = {
+        "positive": (positive_text or "").strip(),
+        "neutral":  (neutral_text  or "").strip(),
+        "negative": (negative_text or "").strip(),
+    }
+    if not any(texts.values()):
+        raise HTTPException(
+            status_code=422,
+            detail="At least one of positive_text, neutral_text, negative_text is required.",
+        )
 
-    has_audio = audio_file is not None and audio_file.filename != ""
+    # ── Read + validate audio uploads ──────────────────────────────────────
+    audio_map: dict[str, Optional[bytes]] = {}
+    for q_key, upload in [
+        ("positive", positive_audio),
+        ("neutral",  neutral_audio),
+        ("negative", negative_audio),
+    ]:
+        if upload and upload.filename:
+            raw = await upload.read()
+            _validate_audio_upload(upload, raw)   # raises 415 or 413 on error
+            audio_map[q_key] = raw
+        else:
+            audio_map[q_key] = None
 
-    if has_audio:
-        audio_bytes = await audio_file.read()
-        if len(audio_bytes) > MAX_AUDIO_SIZE_MB * 1024 * 1024:
-            raise HTTPException(status_code=413,
-                                detail=f"Audio file exceeds {MAX_AUDIO_SIZE_MB} MB limit.")
-    else:
-        audio_bytes = None
+    has_any_audio = any(v is not None for v in audio_map.values())
 
+    # ── Per-question text scoring ──────────────────────────────────────────
+    q_text_scores = {k: _score_text_heuristic(v) for k, v in texts.items()}
+
+    # ── Per-question audio features ────────────────────────────────────────
+    q_audio_feats: dict[str, Optional[dict]] = {}
+    for q_key, raw in audio_map.items():
+        q_audio_feats[q_key] = _extract_audio_features(raw) if raw else None
+
+    # ── Fuse scores ────────────────────────────────────────────────────────
+    # Weighted average: positive (1x), neutral (1x), negative (1.5x)
+    weights = {"positive": 1.0, "neutral": 1.0, "negative": 1.5}
+    w_sum   = sum(weights[k] for k in texts if texts[k])
+
+    text_dep = sum(
+        q_text_scores[k]["depression_score"] * weights[k]
+        for k in texts if texts[k]
+    ) / max(w_sum, 1)
+
+    audio_dep = 0.0
+    n_audio   = 0
+    for q_key, feats in q_audio_feats.items():
+        if feats:
+            audio_dep += feats["depression_proxy"]
+            n_audio += 1
+    audio_dep = audio_dep / max(n_audio, 1) if n_audio > 0 else 0.0
+
+    # Fusion
+    text_weight  = 0.65
+    audio_weight = 0.35 if has_any_audio else 0.0
+    w_total = text_weight + audio_weight
+    fused_score = (text_dep * text_weight + audio_dep * audio_weight) / max(w_total, 1.0)
+    fused_score = float(max(0.0, min(1.0, fused_score)))
+
+    # Override if any crisis keyword detected
+    any_crisis_high = any(q_text_scores[k]["crisis_high"] for k in q_text_scores)
+    if any_crisis_high:
+        fused_score = max(fused_score, 0.72)
+
+    # ── Risk level ─────────────────────────────────────────────────────────
+    if fused_score >= 0.70:   risk_level = "critical"
+    elif fused_score >= 0.50: risk_level = "high"
+    elif fused_score >= 0.30: risk_level = "moderate"
+    else:                     risk_level = "low"
+
+    # ── Try neural model if available ──────────────────────────────────────
+    model_used = "heuristic"
+    demo_mode  = True
     model, tfidf = _load_model()
-
     if model is not None:
         try:
             import torch
-            N_MELS_ = 128
-            MAX_AU_FRAMES_ = 300
-            N_AU_ = 17
-
-            if has_audio and audio_bytes:
-                import librosa
-                y, sr = librosa.load(io.BytesIO(audio_bytes), sr=16000, duration=60)
-                mel = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=N_MELS_)
-                mel = librosa.power_to_db(mel, ref=np.max)
-                mel = (mel - mel.min()) / (mel.max() - mel.min() + 1e-8)
-                mel = mel[:, :128] if mel.shape[1] >= 128 else np.pad(mel, ((0, 0), (0, 128 - mel.shape[1])))
-                audio_tensor = torch.tensor(mel, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-            else:
-                audio_tensor = torch.zeros(1, 1, N_MELS_, 128)
-
-            facial_tensor = torch.zeros(1, MAX_AU_FRAMES_, N_AU_)
-
+            combined_text = " ".join(v for v in texts.values() if v)
+            audio_bytes_combined = next(
+                (v for v in audio_map.values() if v is not None), None
+            )
+            audio_tensor = (
+                _mel_tensor_from_bytes(audio_bytes_combined)
+                if audio_bytes_combined
+                else torch.zeros(1, 1, 128, 128)
+            )
             with torch.no_grad():
                 if tfidf is not None:
-                    vec = tfidf.transform([text.strip()]).toarray().astype("float32")
+                    vec = tfidf.transform([combined_text]).toarray().astype("float32")
                     text_tensor = torch.tensor(vec, dtype=torch.float32)
-                    out = model(audio_tensor, text_tensor, facial_tensor)
+                    out = model(audio_tensor, text_tensor, torch.zeros(1, 300, 17))
                 else:
                     from transformers import BertTokenizer
                     from dataset import MAX_TEXT_LEN
-                    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-                    enc = tokenizer(text, max_length=MAX_TEXT_LEN, padding="max_length",
-                                    truncation=True, return_tensors="pt")
-                    out = model(audio_tensor, enc["input_ids"], enc["attention_mask"], facial_tensor)
-
+                    tokenizer = BertTokenizer.from_pretrained("bert-base-chinese")
+                    enc = tokenizer(combined_text, max_length=MAX_TEXT_LEN,
+                                    padding="max_length", truncation=True,
+                                    return_tensors="pt")
+                    out = model(audio_tensor, enc["input_ids"], enc["attention_mask"],
+                                torch.zeros(1, 300, 17))
                 probs    = torch.softmax(out, dim=1)[0]
-                dep_prob = float(probs[1])
-                pred_cls = int(probs.argmax())
+                fused_score = float(probs[1])
+                if fused_score >= 0.70:   risk_level = "critical"
+                elif fused_score >= 0.50: risk_level = "high"
+                elif fused_score >= 0.30: risk_level = "moderate"
+                else:                     risk_level = "low"
+                model_used = "neural"
+                demo_mode  = False
+        except Exception as exc:
+            print(f"[assess] Neural inference error, using heuristic: {exc}")
 
-            if dep_prob >= 0.70:   risk_level = "critical"
-            elif dep_prob >= 0.50: risk_level = "high"
-            elif dep_prob >= 0.30: risk_level = "moderate"
-            else:                  risk_level = "low"
+    # ── Derive confidence and modality contributions ───────────────────────
+    confidence = round(0.70 + fused_score * 0.25, 3)  # heuristic confidence proxy
 
-            plan = ACTION_PLAN_MAP[risk_level]
-            flat_recs = [step for cat in plan["categories"] for step in cat["steps"]]
-            key_findings = _build_key_findings(text, dep_prob, has_audio)
+    text_contrib  = round(text_weight  / max(w_total, 1) * 100, 1)
+    audio_contrib = round(audio_weight / max(w_total, 1) * 100, 1)
 
-            neural_weights = {
-                "text":  60.0 if not has_audio else 75.0,
-                "audio": 25.0 if has_audio else 0.0,
-            }
+    # ── Per-question score summaries ───────────────────────────────────────
+    per_question_scores = [
+        {
+            "question":    q_key,
+            "prompt":      EATD_QUESTIONS[q_key],
+            "text":        texts[q_key],
+            "score":       round(q_text_scores[q_key]["depression_score"], 3),
+            "has_audio":   audio_map[q_key] is not None,
+            "audio_score": round(q_audio_feats[q_key]["depression_proxy"], 3)
+                           if q_audio_feats[q_key] else None,
+        }
+        for q_key in ("positive", "neutral", "negative")
+    ]
 
-            result = {
-                "risk_level": risk_level,
-                "score": round(dep_prob, 3),
-                "confidence": round(float(probs.max()), 3),
-                "phq8_estimate": round(dep_prob * 24, 1),
-                "binary_prediction": pred_cls,
-                "modality_contributions": neural_weights,
-                "per_modality_confidence": {
-                    "text":  round(float(probs.max()), 3),
-                    "audio": 0.55 if has_audio else None,
-                },
-                "key_findings": key_findings,
-                "crisis_flags": {
-                    "high_risk_detected": dep_prob >= 0.70,
-                    "medium_risk_detected": dep_prob >= 0.50,
-                },
-                "recommendations": flat_recs,
-                "action_plan": plan,
-                "model_used": "neural",
-                "demo_mode": False,
-                "input_type": "audio+text" if has_audio else "text",
-                "timestamp": datetime.now().isoformat(),
-                "user_id": user_id,
-                "note": "Inference from trained bimodal neural model.",
-            }
-            _assessments.append(result)
-            return result
-        except Exception as e:
-            print(f"[assess] Neural inference error, falling back to heuristic: {e}")
+    # ── Key findings ───────────────────────────────────────────────────────
+    key_findings = _build_key_findings(
+        list(q_text_scores.values()),
+        next((f for f in q_audio_feats.values() if f), None),
+        has_any_audio,
+    )
 
-    return _heuristic_analysis(text, has_audio, user_id)
+    # ── Action plan ────────────────────────────────────────────────────────
+    plan = ACTION_PLAN_MAP.get(risk_level, ACTION_PLAN_MAP["low"])
+    flat_recs = [step for cat in plan["categories"] for step in cat["steps"]]
+
+    result = {
+        "risk_level":              risk_level,
+        "score":                   round(fused_score, 3),
+        "confidence":              confidence,
+        "sds_estimated":           round(fused_score * 80, 1),   # SDS scale 0-80
+        "binary_prediction":       int(fused_score >= 0.40),
+        "modality_contributions":  {"text": text_contrib, "audio": audio_contrib},
+        "per_modality_confidence": {
+            "text":  0.85,
+            "audio": round(audio_dep, 3) if has_any_audio else None,
+        },
+        "per_question_scores":     per_question_scores,
+        "key_findings":            key_findings,
+        "crisis_flags": {
+            "high_risk_detected":   any_crisis_high,
+            "medium_risk_detected": any(q_text_scores[k]["crisis_mid"] for k in q_text_scores),
+        },
+        "recommendations": flat_recs,
+        "action_plan":     plan,
+        "model_used":      model_used,
+        "demo_mode":       demo_mode,
+        "input_type":      "audio+text" if has_any_audio else "text",
+        "timestamp":       datetime.now().isoformat(),
+        "user_id":         user_id,
+    }
+
+    _assessments.append(result)
+    return result
 
 
-# Legacy path alias kept for backward compatibility
+# ── Legacy aliases (kept for backward compatibility) ──────────────────────────
+
 @app.post("/api/multimodal/analyze")
 async def multimodal_analyze_legacy(
     text: str = Form(...),
     user_id: str = Form("anonymous"),
     audio_file: Optional[UploadFile] = File(None),
 ):
-    """Alias for POST /api/assess/multimodal."""
-    return await assess_multimodal(text=text, user_id=user_id, audio_file=audio_file)
+    """Legacy single-text alias — routes to the EATD 3-question endpoint."""
+    return await assess_multimodal(
+        positive_text=text,
+        neutral_text="",
+        negative_text="",
+        positive_audio=audio_file,
+        neutral_audio=None,
+        negative_audio=None,
+        user_id=user_id,
+    )
 
 
 @app.post("/api/multimodal/analyze/text")
 async def multimodal_analyze_text(req: MultimodalTextRequest):
     """JSON-body text-only analysis shortcut."""
-    result = _heuristic_analysis(req.text.strip(), has_audio=False, user_id=req.user_id)
-    return result
+    return await assess_multimodal(
+        positive_text=req.text,
+        neutral_text="",
+        negative_text="",
+        user_id=req.user_id,
+    )
 
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+

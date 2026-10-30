@@ -1,49 +1,92 @@
 {
-  "_description": "⚠ PLACEHOLDER — replace ALL numeric values with your real training results before submission.",
-  "_dataset": "EATD-Corpus (Shen et al., ICASSP 2022) — bimodal: audio + Mandarin text, SDS-derived labels",
-  "_split": "80% train / 20% val, stratified by label (EATD ~162 participants, class-imbalanced)",
-  "_training": "CNN + LSTM + BiLSTM late fusion. BERT text encoder (last-2 layers fine-tuned), mel-spectrogram audio CNN. 30 epochs, batch 8, LR 2e-4.",
-  "_how_to_update": "After running `python backend/train.py` or `python backend/train_cpu_fast.py`, copy the metrics from `backend/checkpoints/eatd_fast/final_metrics.json` here.",
+  "_description": "⚠  PLACEHOLDER — replace ALL numeric values with your real training results before submission.",
+  "_dataset": "EATD-Corpus (Shen et al., ICASSP 2022) — bimodal: audio + Mandarin text, SDS-derived labels (≈162 participants, class-imbalanced)",
+  "_split": "80% train / 20% val, stratified by label",
+  "_training": "CNN (audio branch), LSTM + BiLSTM (text branch), late-fusion MLP. bert-base-chinese text encoder (last 2 layers fine-tuned). 30 epochs, batch 8, LR 2e-4, AdamW.",
+  "_cross_validation": "5-fold stratified CV on train split; reported metrics are mean ± std across folds. Final model retrained on full train split.",
+  "_how_to_update": "After running `python backend/train.py --mode eatd`, copy metrics from `backend/checkpoints/eatd/final_metrics.json` into this file.",
   "models": [
     {
-      "name": "CNN (audio branch)",
+      "name": "CNN (audio only)",
+      "branch": "audio",
       "description": "2D CNN on mel-spectrograms — audio-only baseline",
-      "accuracy": null,
+      "accuracy":  null,
       "precision": null,
-      "recall": null,
-      "f1": null,
-      "roc_auc": null
+      "recall":    null,
+      "f1":        null,
+      "roc_auc":   null,
+      "cv_f1_mean": null,
+      "cv_f1_std":  null
     },
     {
-      "name": "LSTM (text branch)",
-      "description": "Unidirectional LSTM on TF-IDF / word embeddings — text-only baseline",
-      "accuracy": null,
+      "name": "LSTM (text only)",
+      "branch": "text",
+      "description": "Unidirectional LSTM on jieba-tokenised word embeddings — text-only baseline",
+      "accuracy":  null,
       "precision": null,
-      "recall": null,
-      "f1": null,
-      "roc_auc": null
+      "recall":    null,
+      "f1":        null,
+      "roc_auc":   null,
+      "cv_f1_mean": null,
+      "cv_f1_std":  null
     },
     {
-      "name": "BiLSTM (text branch)",
+      "name": "BiLSTM (text only)",
+      "branch": "text",
       "description": "Bidirectional LSTM on text token sequence — text-only baseline",
-      "accuracy": null,
+      "accuracy":  null,
       "precision": null,
-      "recall": null,
-      "f1": null,
-      "roc_auc": null
+      "recall":    null,
+      "f1":        null,
+      "roc_auc":   null,
+      "cv_f1_mean": null,
+      "cv_f1_std":  null
     },
     {
-      "name": "Fusion (audio + text)",
-      "description": "Late fusion of CNN + LSTM + BiLSTM branches — bimodal result",
-      "accuracy": null,
+      "name": "Fusion (CNN + LSTM)",
+      "branch": "fusion",
+      "description": "Late fusion of CNN (audio) + LSTM (text) — bimodal result",
+      "accuracy":  null,
       "precision": null,
-      "recall": null,
-      "f1": null,
-      "roc_auc": null
+      "recall":    null,
+      "f1":        null,
+      "roc_auc":   null,
+      "cv_f1_mean": null,
+      "cv_f1_std":  null
+    },
+    {
+      "name": "Fusion (CNN + BiLSTM)",
+      "branch": "fusion",
+      "description": "Late fusion of CNN (audio) + BiLSTM (text) — bimodal result",
+      "accuracy":  null,
+      "precision": null,
+      "recall":    null,
+      "f1":        null,
+      "roc_auc":   null,
+      "cv_f1_mean": null,
+      "cv_f1_std":  null
     }
   ],
   "confusion_matrix": {
+    "_note": "Fusion (CNN + BiLSTM) on held-out test split. Replace nulls with actual counts.",
     "labels": ["Non-depressed", "Depressed"],
     "Fusion": [[null, null], [null, null]]
-  }
+  },
+  "dataset_notes": {
+    "name": "EATD-Corpus",
+    "citation": "Shen, Y., Yang, H., & Lin, L. (2022). Automatic Depression Detection: An Emotional Audio-Textual Corpus and a GRU/Transformer-Based Model. ICASSP 2022.",
+    "participants": 162,
+    "class_balance": "Imbalanced — majority non-depressed. Class weighting applied during training.",
+    "language": "Mandarin Chinese",
+    "text_tokeniser": "jieba (for LSTM/BiLSTM baselines); bert-base-chinese (for BERT encoder)",
+    "audio_features": "Mel-spectrogram (n_mels=128, hop_length=512, n_fft=2048), MFCC-40, pitch (F0), energy, speech rate, pause ratio"
+  },
+  "limitations": [
+    "Small dataset (~162 participants) — results may not generalise to broader populations.",
+    "Mandarin-only corpus — the model is not validated on other languages.",
+    "SDS-derived labels introduce labelling noise compared to clinician-administered HDRS.",
+    "Class imbalance in EATD-Corpus may inflate accuracy; F1 and ROC-AUC are the primary metrics.",
+    "Audio recorded in controlled conditions — real-world noise degrades audio-branch performance.",
+    "This system is a research prototype and NOT a clinical diagnostic tool."
+  ]
 }
