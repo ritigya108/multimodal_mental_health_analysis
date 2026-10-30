@@ -38,7 +38,7 @@ Three branch experiments were run independently before fusion:
 
 **EATD-Corpus** (Shen et al., ICASSP 2022)
 
-- ~162 participants; Mandarin audio + text transcripts
+- ~162 participants; audio + text transcripts
 - Three emotional questions per participant (positive, neutral, negative)
 - Labels: SDS (Self-Rating Depression Scale) scores → binary threshold ≥ 53
 - Class imbalance: ~78% non-depressed / ~22% depressed

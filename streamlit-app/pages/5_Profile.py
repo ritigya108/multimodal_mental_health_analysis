@@ -8,11 +8,11 @@ st.title("My Profile ðŸ‘¤")
 # Initialize profile data
 if 'profile' not in st.session_state:
     st.session_state.profile = {
-        'name': 'John Doe',
-        'email': 'john.doe@example.com',
-        'phone': '+1 (555) 123-4567',
-        'age': 28,
-        'emergency_contact': 'Jane Doe - +1 (555) 987-6543',
+        'name': 'User',
+        'email': 'user@example.com',
+        'phone': '+91 98765 43210',
+        'age': 22,
+        'emergency_contact': 'Family Member - +91 98765 00000',
         'bio': 'Working on improving my mental health one day at a time.',
         'join_date': 'January 2024',
         'total_mood_logs': 45,

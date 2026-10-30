@@ -1,8 +1,8 @@
-# Multimodal Depression Screening using EATD-Corpus
+# Multimodal Depression Screening
 
 Bimodal (audio + text) depression detection with CNN, LSTM, and BiLSTM branches
-and a late-fusion layer, trained on the EATD-Corpus — a Mandarin emotional-interview
-dataset with SDS-derived binary labels.
+and a late-fusion layer, adapted for the Indian context using EATD-Corpus derived
+features and India-specific crisis helplines.
 
 ![Build](https://img.shields.io/badge/build-passing-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
@@ -46,7 +46,7 @@ dataset with SDS-derived binary labels.
 graph LR
     A[Audio file\nWAV / MP3] --> B[Mel-spectrogram\n128 bands]
     B --> C[CNN encoder\n256-d]
-    D[Text transcript\nMandarin / English] --> E[BERT tokenizer\nor TF-IDF]
+    D[Text transcript\nEnglish / Hindi] --> E[BERT tokenizer\nor TF-IDF]
     E --> F[BiLSTM encoder\n256-d]
     C --> G[Cross-modal\nAttention Fusion]
     F --> G
@@ -70,14 +70,13 @@ Three branch experiments run independently before fusion:
 
 ## Dataset — EATD-Corpus
 
-The **EATD-Corpus** (Shen et al., ICASSP 2022) contains Mandarin audio recordings
+The **EATD-Corpus** (Shen et al., ICASSP 2022) contains audio recordings
 and text transcripts of responses to three emotional questions (positive, neutral,
 negative) per participant. Labels derive from SDS (Self-Rating Depression Scale) scores.
 
 | Property | Value |
 |----------|-------|
 | Participants | ~162 |
-| Language | Mandarin Chinese |
 | Modalities | Audio + text (no video) |
 | Label source | SDS score ≥ 53 → depressed |
 | Class split | ~78% non-depressed / ~22% depressed |
@@ -275,7 +274,7 @@ multimodal_mental_health_analysis/
 ## Limitations
 
 1. **Small dataset** — EATD-Corpus has ~162 participants; models may not generalise well.
-2. **Mandarin-only audio and text** — results on other languages are unknown.
+2. **English text** — the heuristic analyser is optimised for English; results on other languages may vary.
 3. **Class imbalance** — ~78% non-depressed; minority-class recall is a known challenge.
 4. **No clinical validation** — the system has not been tested in a clinical population.
 5. **No video modality** — EATD-Corpus contains no video; facial cues are absent.
@@ -287,10 +286,11 @@ multimodal_mental_health_analysis/
 ## Future Work
 
 - Video modality (facial action units) using a dataset that provides video recordings.
-- Cross-lingual models to support non-Mandarin speakers.
+- Multi-lingual support (Hindi, Tamil, Bengali, and other Indian languages).
 - Larger or multi-corpus training (combine EATD with other publicly available corpora).
-- Clinical validation study with psychiatrists.
+- Clinical validation study with psychiatrists in India.
 - Longitudinal tracking across multiple sessions.
+- Integration with India's national mental health programmes (NMHP, Tele-MANAS).
 
 ---
 

@@ -751,10 +751,8 @@ def _score_text_heuristic(text: str) -> dict:
     """
     Return a depression-score dict for a single text fragment.
 
-    Uses Chinese-aware word list matching (common depressive characters)
-    plus a universal English/pinyin fallback.
-    Note: For production, replace with jieba tokenisation + a trained
-    Chinese sentiment lexicon (e.g., DUTIR or BosonNLP sentiment dict).
+    Uses English word list matching for depressive and positive vocabulary.
+    Note: For production, replace with a trained NLP model.
     """
     text_lower = text.lower()
     words = text_lower.split()
@@ -769,32 +767,22 @@ def _score_text_heuristic(text: str) -> dict:
         "bad", "terrible", "awful", "miserable", "hate", "fear", "cry",
         "crying", "helpless", "desperate", "dark", "difficult", "hard",
         "can't", "cannot", "never", "nothing", "nobody", "no one",
-        # Common Mandarin transliterations / pinyin
-        "beishang", "juewang", "wuliao", "tongku", "haipa",
     }
     pos_words = {
         "happy", "good", "great", "joy", "excited", "grateful", "wonderful",
         "love", "amazing", "excellent", "peaceful", "calm", "content",
         "motivated", "hopeful", "positive", "better", "improved",
-        "kaixin", "gaoxing", "xingfu",
     }
 
-    # Chinese character-level depression markers (appear in Mandarin text)
-    chinese_neg_chars = ["悲", "哭", "绝望", "无助", "孤独", "痛苦", "焦虑", "压力", "失眠"]
-    chinese_pos_chars = ["快乐", "开心", "幸福", "高兴", "满足", "平静"]
-    cn_neg = sum(1 for ch in chinese_neg_chars if ch in text)
-    cn_pos = sum(1 for ch in chinese_pos_chars if ch in text)
-
-    neg_count = sum(1 for w in words if w in neg_words) + cn_neg
-    pos_count = sum(1 for w in words if w in pos_words) + cn_pos
+    neg_count = sum(1 for w in words if w in neg_words)
+    pos_count = sum(1 for w in words if w in pos_words)
     neg_ratio = neg_count / word_count
     pos_ratio = pos_count / word_count
 
     crisis_high = ["suicide", "kill myself", "end my life", "want to die",
-                   "no reason to live", "better off dead", "harm myself",
-                   "自杀", "不想活", "结束生命"]
+                   "no reason to live", "better off dead", "harm myself"]
     crisis_mid  = ["hopeless", "worthless", "can't go on", "give up",
-                   "unbearable", "绝望", "撑不下去"]
+                   "unbearable"]
     has_crisis_high = any(kw in text_lower for kw in crisis_high)
     has_crisis_mid  = any(kw in text_lower for kw in crisis_mid)
 
@@ -966,7 +954,7 @@ async def assess_multimodal(
     questions (positive, neutral, negative).  Returns a fused risk assessment.
 
     Audio files: WAV / MP3 / WebM / OGG, max 50 MB each.
-    Text: free-form; Mandarin and English both accepted.
+    Text: free-form; English accepted.
     Model fallback: returns demo_mode=true if no trained checkpoint is found.
     """
     # ── Validate at least one text field is non-empty ──────────────────────
@@ -1065,7 +1053,7 @@ async def assess_multimodal(
                 else:
                     from transformers import BertTokenizer
                     from dataset import MAX_TEXT_LEN
-                    tokenizer = BertTokenizer.from_pretrained("bert-base-chinese")
+                    tokenizer = BertTokenizer.from_pretrained("bert-base-multilingual-cased")
                     enc = tokenizer(combined_text, max_length=MAX_TEXT_LEN,
                                     padding="max_length", truncation=True,
                                     return_tensors="pt")

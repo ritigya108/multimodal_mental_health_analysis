@@ -26,22 +26,22 @@ const EATD_QUESTIONS = [
     key:         'positive',
     label:       'Positive question',
     prompt:      'Describe a positive memory or a time you felt happy.',
-    placeholder: 'Write your response here. For example: "I felt happy when..." (Mandarin or English)',
-    sampleText:  '我和家人一起去旅行，大家都很开心，感觉特别幸福。',
+    placeholder: 'Write your response here. For example: "I felt happy when..."',
+    sampleText:  'I went on a trip with my family. We visited a temple near our hometown and spent the whole day together. It was a very joyful and peaceful experience.',
   },
   {
     key:         'neutral',
     label:       'Neutral question',
     prompt:      'Describe your daily routine.',
     placeholder: 'Describe a typical day: when you wake up, what you do, how you feel.',
-    sampleText:  '我每天早上七点起床，吃早饭，然后去上学或者工作。',
+    sampleText:  'I usually wake up around seven in the morning, have breakfast at home, and then leave for college or work. Evenings I spend with my family.',
   },
   {
     key:         'negative',
     label:       'Negative question',
     prompt:      'Describe a difficult or stressful experience.',
     placeholder: 'You can write about a challenging situation, how it affected you, or how you coped.',
-    sampleText:  '最近我感到很疲惫，有时候觉得很难集中注意力，睡眠也不太好。',
+    sampleText:  'Recently I have been feeling very tired and finding it hard to concentrate. I am not sleeping well and feel drained most of the time.',
   },
 ];
 
@@ -211,7 +211,7 @@ function QuestionStep({ q, text, onTextChange, recorder, error }) {
         {q.prompt}
       </Typography>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-        EATD-Corpus emotional question — respond in Mandarin or English.
+        Emotional screening question — please respond in English.
       </Typography>
 
       <TextField
@@ -637,7 +637,7 @@ function Assessment() {
                 {[
                   'Answer all three EATD emotional questions (positive, neutral, negative).',
                   'Optionally record audio for each question for bimodal analysis.',
-                  'The model extracts text features (Chinese-aware) and audio features (MFCC, pitch, energy, speech rate, pauses).',
+                  'The model extracts text features (vocabulary, sentiment) and audio features (MFCC, pitch, energy, speech rate, pauses).',
                   'A late-fusion layer combines both signals across all three questions.',
                   'You receive a risk level, SDS estimate, modality contributions and key findings.',
                 ].map((s, i) => (

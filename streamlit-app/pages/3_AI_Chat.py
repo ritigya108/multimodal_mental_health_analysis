@@ -165,7 +165,7 @@ Are you having trouble falling asleep or staying asleep?"""
 
 Can you tell me more about how you're feeling? I'm here to help in any way I can.
 
-**Remember:** If you're in crisis, please reach out to a professional counselor at 988 (US) or your local emergency services."""
+**Remember:** If you're in crisis, please reach out to **KIRAN: 1800-599-0019** (India, free, 24/7) or your nearest emergency services."""
 
 # Sidebar with resources
 with st.sidebar:

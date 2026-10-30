@@ -45,11 +45,11 @@ def test_score_heuristic_text_only_no_crisis():
     assert result["crisis_mid"] is False
 
 
-def test_score_heuristic_chinese_neg_chars():
-    """Chinese depression characters should increase the score."""
-    result_cn  = _score_text_heuristic("我感到绝望和孤独。")   # hopeless and lonely
-    result_ok  = _score_text_heuristic("我感到幸福快乐。")     # happy
-    assert result_cn["depression_score"] >= result_ok["depression_score"]
+def test_score_heuristic_neg_vs_pos():
+    """Negative text should score higher than positive text."""
+    result_neg = _score_text_heuristic("I feel hopeless and completely alone.")
+    result_pos = _score_text_heuristic("I feel happy and content with my life.")
+    assert result_neg["depression_score"] >= result_pos["depression_score"]
 
 
 # ── Endpoint tests ────────────────────────────────────────────────────────────

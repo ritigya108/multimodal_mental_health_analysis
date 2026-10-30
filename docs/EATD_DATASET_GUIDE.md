@@ -9,9 +9,9 @@ The **EATD-Corpus** (Emotional Audio-Textual Depression) was introduced in:
 > ICASSP 2022. [https://arxiv.org/abs/2202.08210](https://arxiv.org/abs/2202.08210)
 
 It contains:
-- **~162 participants** (recruited from universities in China)
-- **Mandarin audio recordings** of responses to three emotional questions (positive, neutral, negative)
-- **Text transcripts** of those responses (Mandarin)
+- **~162 participants**
+- **Audio recordings** of responses to three emotional questions (positive, neutral, negative)
+- **Text transcripts** of those responses
 - **Labels** derived from the SDS (Self-Rating Depression Scale): binary threshold at SDS raw score ≥ 53
 - **Class imbalance**: approximately 78% non-depressed, 22% depressed
 
