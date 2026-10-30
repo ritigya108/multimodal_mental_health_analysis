@@ -23,7 +23,6 @@ from app_config import (
     CRISIS_HELPLINE_NAME,
     CRISIS_HELPLINE_DESCRIPTION,
     MAX_AUDIO_SIZE_MB,
-    MAX_VIDEO_SIZE_MB,
     DATA_RETENTION_NOTE,
 )
 
@@ -680,7 +679,7 @@ ACTION_PLAN_MAP = {
 }
 
 
-def _build_key_findings(text: str, dep_score: float, has_audio: bool, has_video: bool) -> List[str]:
+def _build_key_findings(text: str, dep_score: float, has_audio: bool) -> List[str]:
     """Generate 3 plain-language key findings from available signals."""
     words = text.lower().split()
     word_count = len(words)
@@ -698,22 +697,20 @@ def _build_key_findings(text: str, dep_score: float, has_audio: bool, has_video:
 
     if fp_ratio > 0.10:
         findings.append(
-            f"Elevated first-person pronoun use ({fp_ratio:.0%}) â€” a known linguistic marker of depression."
+            f"Elevated first-person pronoun use ({fp_ratio:.0%}) — a known linguistic marker of depression."
         )
     else:
         findings.append("First-person pronoun use is within typical range.")
 
     if has_audio:
         findings.append("Audio modality was included; speech features contributed to the overall score.")
-    elif has_video:
-        findings.append("Video modality was included; facial features contributed to the overall score.")
     else:
-        findings.append("Analysis was text-only. Add audio or video for a more comprehensive assessment.")
+        findings.append("Analysis was text-only. Add audio for a bimodal assessment.")
 
     return findings[:3]
 
 
-def _heuristic_analysis(text: str, has_audio: bool, has_video: bool, user_id: str = "anonymous") -> dict:
+def _heuristic_analysis(text: str, has_audio: bool, user_id: str = "anonymous") -> dict:
     text_lower = text.lower()
     words = text_lower.split()
     word_count = len(words)
@@ -756,15 +753,13 @@ def _heuristic_analysis(text: str, has_audio: bool, has_video: bool, user_id: st
     depression_score = float(max(0.0, min(1.0, depression_score)))
 
     audio_conf = 0.55 if has_audio else 0.0
-    video_conf = 0.50 if has_video else 0.0
     text_conf  = 0.85
 
-    weights_sum = text_conf + audio_conf + video_conf
+    weights_sum = text_conf + audio_conf
     if weights_sum > 0:
         fused_score = (
             depression_score * text_conf +
-            depression_score * 0.9 * audio_conf +
-            depression_score * 0.85 * video_conf
+            depression_score * 0.9 * audio_conf
         ) / weights_sum
     else:
         fused_score = depression_score
@@ -781,21 +776,19 @@ def _heuristic_analysis(text: str, has_audio: bool, has_video: bool, user_id: st
         risk_level = "low"
 
     # Modality contributions (normalised to %)
-    mod_total = text_conf + audio_conf + video_conf
+    mod_total = text_conf + audio_conf
     modality_contributions = {
         "text":  round(text_conf  / max(mod_total, 1) * 100, 1),
         "audio": round(audio_conf / max(mod_total, 1) * 100, 1),
-        "video": round(video_conf / max(mod_total, 1) * 100, 1),
     }
     per_modality_confidence = {
         "text":  round(text_conf,  3),
         "audio": round(audio_conf, 3) if has_audio else None,
-        "video": round(video_conf, 3) if has_video else None,
     }
 
     plan = ACTION_PLAN_MAP[risk_level]
     flat_recs = [step for cat in plan["categories"] for step in cat["steps"]]
-    key_findings = _build_key_findings(text, fused_score, has_audio, has_video)
+    key_findings = _build_key_findings(text, fused_score, has_audio)
 
     # Attention-style word weights (simple neg/pos word highlighting)
     word_weights = {}
@@ -805,9 +798,7 @@ def _heuristic_analysis(text: str, has_audio: bool, has_video: bool, user_id: st
         elif w in pos_words:
             word_weights[w] = 1.0
 
-    input_type = "combined" if (has_audio and has_video) else \
-                 "audio" if has_audio else \
-                 "video" if has_video else "text"
+    input_type = "audio+text" if has_audio else "text"
 
     result = {
         "risk_level": risk_level,
@@ -855,23 +846,20 @@ async def assess_multimodal(
     text: str = Form(..., description="Interview/journal transcript text"),
     user_id: str = Form("anonymous"),
     audio_file: Optional[UploadFile] = File(None),
-    video_file: Optional[UploadFile] = File(None),
 ):
     """
-    Primary multimodal assessment endpoint.
+    Primary bimodal assessment endpoint.
 
-    Accepts text (required) + optional audio (.wav/.mp3) and video (.mp4/.avi).
+    Accepts text (required) + optional audio (.wav/.mp3).
     Returns: risk_level, score, confidence, modality_contributions,
-             per_modality_confidence, key_findings, timestamp.
+             key_findings, timestamp.
     Falls back to heuristic mode with demo_mode=true if no checkpoint is available.
     """
     if not text or not text.strip():
         raise HTTPException(status_code=422, detail="'text' field is required.")
 
     has_audio = audio_file is not None and audio_file.filename != ""
-    has_video = video_file is not None and video_file.filename != ""
 
-    # File size validation
     if has_audio:
         audio_bytes = await audio_file.read()
         if len(audio_bytes) > MAX_AUDIO_SIZE_MB * 1024 * 1024:
@@ -879,13 +867,6 @@ async def assess_multimodal(
                                 detail=f"Audio file exceeds {MAX_AUDIO_SIZE_MB} MB limit.")
     else:
         audio_bytes = None
-
-    if has_video:
-        video_bytes = await video_file.read()
-        if len(video_bytes) > MAX_VIDEO_SIZE_MB * 1024 * 1024:
-            raise HTTPException(status_code=413,
-                                detail=f"Video file exceeds {MAX_VIDEO_SIZE_MB} MB limit.")
-    # Video bytes discarded after size check (no video inference yet)
 
     model, tfidf = _load_model()
 
@@ -933,16 +914,12 @@ async def assess_multimodal(
 
             plan = ACTION_PLAN_MAP[risk_level]
             flat_recs = [step for cat in plan["categories"] for step in cat["steps"]]
-            key_findings = _build_key_findings(text, dep_prob, has_audio, has_video)
+            key_findings = _build_key_findings(text, dep_prob, has_audio)
 
-            input_type = "combined" if (has_audio and has_video) else \
-                         "audio" if has_audio else \
-                         "video" if has_video else "text"
-
-            neural_weights = {"text": 60.0, "audio": 25.0 if has_audio else 0.0,
-                              "video": 15.0 if has_video else 0.0}
-            if not has_audio and not has_video:
-                neural_weights = {"text": 100.0, "audio": 0.0, "video": 0.0}
+            neural_weights = {
+                "text":  60.0 if not has_audio else 75.0,
+                "audio": 25.0 if has_audio else 0.0,
+            }
 
             result = {
                 "risk_level": risk_level,
@@ -952,9 +929,8 @@ async def assess_multimodal(
                 "binary_prediction": pred_cls,
                 "modality_contributions": neural_weights,
                 "per_modality_confidence": {
-                    "text": round(float(probs.max()), 3),
+                    "text":  round(float(probs.max()), 3),
                     "audio": 0.55 if has_audio else None,
-                    "video": 0.50 if has_video else None,
                 },
                 "key_findings": key_findings,
                 "crisis_flags": {
@@ -965,17 +941,17 @@ async def assess_multimodal(
                 "action_plan": plan,
                 "model_used": "neural",
                 "demo_mode": False,
-                "input_type": input_type,
+                "input_type": "audio+text" if has_audio else "text",
                 "timestamp": datetime.now().isoformat(),
                 "user_id": user_id,
-                "note": "Inference from trained multimodal neural model.",
+                "note": "Inference from trained bimodal neural model.",
             }
             _assessments.append(result)
             return result
         except Exception as e:
-            print(f"[multimodal] Neural inference error, falling back to heuristic: {e}")
+            print(f"[assess] Neural inference error, falling back to heuristic: {e}")
 
-    return _heuristic_analysis(text, has_audio, has_video, user_id)
+    return _heuristic_analysis(text, has_audio, user_id)
 
 
 # Legacy path alias kept for backward compatibility
@@ -984,17 +960,15 @@ async def multimodal_analyze_legacy(
     text: str = Form(...),
     user_id: str = Form("anonymous"),
     audio_file: Optional[UploadFile] = File(None),
-    video_file: Optional[UploadFile] = File(None),
 ):
-    """Deprecated â€” use POST /api/assess/multimodal instead."""
-    return await assess_multimodal(text=text, user_id=user_id,
-                                   audio_file=audio_file, video_file=video_file)
+    """Alias for POST /api/assess/multimodal."""
+    return await assess_multimodal(text=text, user_id=user_id, audio_file=audio_file)
 
 
 @app.post("/api/multimodal/analyze/text")
 async def multimodal_analyze_text(req: MultimodalTextRequest):
     """JSON-body text-only analysis shortcut."""
-    result = _heuristic_analysis(req.text.strip(), has_audio=False, has_video=False, user_id=req.user_id)
+    result = _heuristic_analysis(req.text.strip(), has_audio=False, user_id=req.user_id)
     return result
 
 

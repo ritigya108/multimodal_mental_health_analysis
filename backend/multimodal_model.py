@@ -1,16 +1,15 @@
 """
-Multimodal Depression Detection Model for DAIC-WOZ
-====================================================
+Bimodal Depression Detection Model — EATD-Corpus
+=================================================
 Architecture
 ------------
-  Audio   → AudioCNN  → 256-d embedding
-  Text    → BERT      → 256-d projection
-  Facial  → AU-LSTM   → 256-d embedding
-  Fusion  → Cross-modal Attention → MLP head
+  Audio   → AudioEncoder (CNN on mel-spectrograms) → 256-d embedding
+  Text    → TextEncoder  (BERT + projection)        → 256-d embedding
+  Fusion  → CrossModalAttentionFusion → MLP head
 
 Supports two tasks
-  - classification : binary PHQ8_Binary (0 / 1)
-  - regression     : continuous PHQ8_Score (0–24)
+  - classification : binary (0 = non-depressed / 1 = depressed)
+  - regression     : continuous SDS-derived score (0–24 PHQ-8 scale)
 """
 
 import torch
@@ -187,15 +186,15 @@ class CrossModalAttentionFusion(nn.Module):
 
 class MultimodalDepressionModel(nn.Module):
     """
-    End-to-end multimodal depression detection model for DAIC-WOZ.
+    End-to-end bimodal depression detection model for EATD-Corpus.
 
     Parameters
     ----------
     task         : 'classification' → 2-class softmax output
-                   'regression'     → single scalar PHQ-8 score (0–24)
+                   'regression'     → single scalar score (0–24)
     embed_dim    : shared embedding dimension across modalities
     freeze_bert  : freeze BERT weights (recommended for small datasets)
-    n_au         : number of Action Unit columns (default 17 from OpenFace)
+    n_au         : Action Unit feature dimension kept for API compatibility
     dropout      : dropout probability throughout
     """
 

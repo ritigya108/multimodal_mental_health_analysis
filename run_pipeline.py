@@ -1,17 +1,11 @@
 """
-Multimodal Mental Health Analysis — Master Pipeline Runner
-===========================================================
+Multimodal Depression Screening — Master Pipeline Runner
+=========================================================
 Run this ONE script from ANYWHERE to execute the full pipeline.
 
 Usage
 -----
-  # From the project root OR anywhere:
-  python run_pipeline.py
-
-  # With real DAIC-WOZ dataset (once you receive it):
-  python run_pipeline.py --mode daic --daic_root C:/data/daic-woz
-
-  # With EATD-Corpus (free GitHub dataset):
+  # With EATD-Corpus (obtain from https://github.com/speechandlanguageprocessing/ICASSP2022-Depression):
   python run_pipeline.py --mode eatd --eatd_root C:/data/ICASSP2022-Depression
 
   # With synthetic data (no dataset needed, works right now):
@@ -22,8 +16,7 @@ Usage
 
 Arguments
 ---------
-  --mode         : synthetic | daic | eatd | evaluate  (default: synthetic)
-  --daic_root    : path to DAIC-WOZ root folder (required for --mode daic)
+  --mode         : synthetic | eatd | evaluate  (default: synthetic)
   --eatd_root    : path to EATD-Corpus root folder (required for --mode eatd)
   --checkpoint   : path to .pt file (required for --mode evaluate)
   --task         : classification | regression  (default: classification)
