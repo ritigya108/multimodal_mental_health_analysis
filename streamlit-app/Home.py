@@ -95,7 +95,7 @@ if latest:
     # Modality bars
     st.subheader("Modality contribution")
     contribs = latest.get("modality_contributions", {})
-    for mod in ("Text", "Audio", "Video"):
+    for mod in ("Text", "Audio"):
         val = contribs.get(mod.lower(), 0)
         st.progress(int(val), text=f"{mod}: {val:.1f}%")
 

@@ -29,7 +29,7 @@ with st.sidebar:
     st.caption("Free 24/7")
 
 st.title("New assessment")
-st.caption("Enter a text transcript and optionally upload audio or video.")
+st.caption("Enter a text transcript and optionally upload audio.")
 
 RISK_COLOR = {"low": "green", "moderate": "orange", "high": "red", "critical": "red"}
 
@@ -53,11 +53,8 @@ text = st.text_area(
     key="assess_text",
 )
 
-col_audio, col_video = st.columns(2)
-with col_audio:
-    audio_file = st.file_uploader("Audio file (optional)", type=["wav", "mp3", "webm", "ogg"])
-with col_video:
-    video_file = st.file_uploader("Video file (optional)", type=["mp4", "webm", "avi"])
+audio_file = st.file_uploader("Audio file (optional)", type=["wav", "mp3", "webm", "ogg"])
+video_file = None
 
 st.divider()
 
@@ -107,7 +104,7 @@ if st.button("Run assessment", type="primary", disabled=not text.strip()):
 
     st.subheader("Modality contribution")
     contribs = result.get("modality_contributions", {})
-    for mod in ("Text", "Audio", "Video"):
+    for mod in ("Text", "Audio"):
         val = contribs.get(mod.lower(), 0)
         st.progress(int(val), text=f"{mod}: {val:.1f}%")
 
