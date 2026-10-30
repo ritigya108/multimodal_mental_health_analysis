@@ -80,14 +80,13 @@ const apiService = {
   // â”€â”€ Assessment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   /**
    * POST /api/assess/multimodal
-   * text required; audioFile and videoFile optional File objects.
+   * text required; audioFile optional File object (WAV / MP3 / WebM).
    */
-  assess: async (text, audioFile = null, videoFile = null) => {
+  assess: async (text, audioFile = null) => {
     const formData = new FormData();
     formData.append('text', text);
     formData.append('user_id', localStorage.getItem('mindcare_user_id') || 'user123');
     if (audioFile) formData.append('audio_file', audioFile);
-    if (videoFile) formData.append('video_file', videoFile);
     const r = await api.post('/api/assess/multimodal', formData, {
       headers: { 'Content-Type': undefined }, // let browser set multipart boundary
     });

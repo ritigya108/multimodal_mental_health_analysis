@@ -6,9 +6,6 @@ import Box from '@mui/material/Box';
 
 // Pages
 import Dashboard from './pages/Dashboard';
-import Journal from './pages/Journal';
-import ChatBot from './pages/ChatBot';
-import Profile from './pages/Profile';
 import Assessment from './pages/Assessment';
 import PHQ8 from './pages/PHQ8';
 import ModelPerformance from './pages/ModelPerformance';
@@ -141,10 +138,7 @@ function App() {
                   <Route path="/assess" element={<Assessment />} />
                   <Route path="/assess/report/:id" element={<ReportDetail />} />
                   <Route path="/phq8" element={<PHQ8 />} />
-                  <Route path="/journal" element={<Journal />} />
-                  <Route path="/chat" element={<ChatBot />} />
                   <Route path="/model" element={<ModelPerformance />} />
-                  <Route path="/profile" element={<Profile />} />
                   <Route path="/settings" element={<Settings />} />
                 </Routes>
               </Box>

@@ -1,14 +1,13 @@
 {
-  "name": "mental-health-ai-frontend",
+  "name": "depression-screening-frontend",
   "version": "1.0.0",
-  "description": "React frontend for AI-based mental health monitoring",
+  "description": "React 18 frontend for bimodal depression screening (EATD-Corpus)",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.0",
     "axios": "^1.6.2",
-    "recharts": "^2.10.3",
     "date-fns": "^2.30.0",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",

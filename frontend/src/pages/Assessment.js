@@ -8,7 +8,6 @@ import {
 import {
   TextFields as TextIcon,
   Mic as MicIcon,
-  Videocam as VideoIcon,
   Layers as CombinedIcon,
   Stop as StopIcon,
   Replay as ReplayIcon,
@@ -38,16 +37,12 @@ function useRecorder(mediaType) {
   const start = async () => {
     setPermError(null);
     try {
-      const constraints = mediaType === 'video'
-        ? { video: true, audio: true }
-        : { audio: true };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       chunksRef.current = [];
       const mr = new MediaRecorder(stream);
       mr.ondataavailable = (e) => chunksRef.current.push(e.data);
       mr.onstop = () => {
-        const mimeType = mediaType === 'video' ? 'video/webm' : 'audio/webm';
-        setBlob(new Blob(chunksRef.current, { type: mimeType }));
+        setBlob(new Blob(chunksRef.current, { type: 'audio/webm' }));
         stream.getTracks().forEach((t) => t.stop());
       };
       mr.start();
@@ -58,8 +53,8 @@ function useRecorder(mediaType) {
     } catch (e) {
       setPermError(
         e.name === 'NotAllowedError'
-          ? 'Permission denied. Please allow microphone/camera access in browser settings.'
-          : `Could not access ${mediaType}: ${e.message}`
+          ? 'Permission denied. Please allow microphone access in browser settings.'
+          : `Could not access microphone: ${e.message}`
       );
     }
   };
@@ -170,7 +165,6 @@ function Assessment() {
   const [apiError, setApiError] = useState(null);
 
   const audioRecorder = useRecorder('audio');
-  const videoRecorder = useRecorder('video');
 
   const handleSubmit = async () => {
     if (!text.trim()) {
@@ -180,13 +174,10 @@ function Assessment() {
     setSubmitting(true);
     setApiError(null);
     try {
-      const audioBlob = tab === 1 ? audioRecorder.blob : (tab === 3 ? audioRecorder.blob : null);
-      const videoBlob = tab === 2 ? videoRecorder.blob : (tab === 3 ? videoRecorder.blob : null);
-
+      const audioBlob = (tab === 1 || tab === 2) ? audioRecorder.blob : null;
       const audioFile = audioBlob ? new File([audioBlob], 'recording.webm', { type: audioBlob.type }) : null;
-      const videoFile = videoBlob ? new File([videoBlob], 'recording.webm', { type: videoBlob.type }) : null;
 
-      const res = await apiService.assess(text, audioFile, videoFile);
+      const res = await apiService.assess(text, audioFile, null);
       setResult(res);
 
       // Store result in session storage so ReportDetail can access it
@@ -200,9 +191,8 @@ function Assessment() {
   };
 
   const TABS = [
-    { label: 'Text', icon: <TextIcon /> },
-    { label: 'Voice', icon: <MicIcon /> },
-    { label: 'Video', icon: <VideoIcon /> },
+    { label: 'Text',     icon: <TextIcon /> },
+    { label: 'Voice',    icon: <MicIcon /> },
     { label: 'Combined', icon: <CombinedIcon /> },
   ];
 
@@ -217,7 +207,7 @@ function Assessment() {
           New assessment
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Provide your text transcript and optionally record audio or video for a fuller analysis.
+          Provide your text transcript and optionally record audio for a bimodal analysis.
         </Typography>
       </Box>
 
@@ -281,23 +271,9 @@ function Assessment() {
                 <TabPanel value={tab} index={2}>
                   <Divider sx={{ mb: 2 }} />
                   <Typography variant="body2" sx={{ mb: 2, fontWeight: 500 }}>
-                    Video recording (optional)
-                  </Typography>
-                  <RecorderPanel type="video" label="video" icon={<VideoIcon />} />
-                </TabPanel>
-
-                <TabPanel value={tab} index={3}>
-                  <Divider sx={{ mb: 2 }} />
-                  <Typography variant="body2" sx={{ mb: 2, fontWeight: 500 }}>
-                    Audio recording
+                    Voice recording (optional)
                   </Typography>
                   <RecorderPanel type="audio" label="audio" icon={<MicIcon />} />
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="body2" sx={{ mb: 2, fontWeight: 500 }}>
-                      Video recording
-                    </Typography>
-                    <RecorderPanel type="video" label="video" icon={<VideoIcon />} />
-                  </Box>
                 </TabPanel>
 
                 {apiError && (
@@ -367,9 +343,9 @@ function Assessment() {
                 <Box component="ol" sx={{ m: 0, pl: 2 }}>
                   {[
                     'Enter or record your text transcript.',
-                    'Optionally add audio or video for richer analysis.',
-                    'The model extracts features from each modality.',
-                    'A late-fusion layer combines all signals.',
+                    'Optionally record audio for bimodal analysis.',
+                    'The model extracts features from text and audio.',
+                    'A late-fusion layer combines both signals.',
                     'You receive a risk level, confidence, and key findings.',
                   ].map((step, i) => (
                     <Box component="li" key={i} sx={{ mb: 0.75 }}>

@@ -21,10 +21,7 @@ import {
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
-  Book as BookIcon,
-  Chat as ChatIcon,
   Psychology as AssessIcon,
-  Person as PersonIcon,
   Assessment as MetricsIcon,
   Quiz as PHQ8Icon,
   Settings as SettingsIcon,
@@ -41,10 +38,7 @@ const NAV_ITEMS = [
   { text: 'Overview',    icon: <DashboardIcon />, path: '/dashboard', group: 'main' },
   { text: 'Assessment',  icon: <AssessIcon />,    path: '/assess',    group: 'main' },
   { text: 'PHQ-8',       icon: <PHQ8Icon />,      path: '/phq8',      group: 'main' },
-  { text: 'Journal',     icon: <BookIcon />,      path: '/journal',   group: 'tools' },
-  { text: 'AI Chat',     icon: <ChatIcon />,      path: '/chat',      group: 'tools' },
   { text: 'Model Performance', icon: <MetricsIcon />, path: '/model', group: 'tools' },
-  { text: 'Profile',     icon: <PersonIcon />,    path: '/profile',   group: 'account' },
   { text: 'Settings',    icon: <SettingsIcon />,  path: '/settings',  group: 'account' },
 ];
 
@@ -126,6 +120,7 @@ function Navigation() {
   const mainItems    = NAV_ITEMS.filter(i => i.group === 'main');
   const toolItems    = NAV_ITEMS.filter(i => i.group === 'tools');
   const accountItems = NAV_ITEMS.filter(i => i.group === 'account');
+  // Groups with no items will render nothing
 
   return (
     <Drawer
@@ -213,9 +208,6 @@ function Navigation() {
         onClose={handleUserMenuClose}
         transformOrigin={{ horizontal: 'left', vertical: 'top' }}
       >
-        <MenuItem onClick={() => { handleUserMenuClose(); navigate('/profile'); }}>
-          <PersonIcon fontSize="small" sx={{ mr: 1 }} /> Profile
-        </MenuItem>
         <MenuItem onClick={() => { handleUserMenuClose(); navigate('/settings'); }}>
           <SettingsIcon fontSize="small" sx={{ mr: 1 }} /> Settings
         </MenuItem>
