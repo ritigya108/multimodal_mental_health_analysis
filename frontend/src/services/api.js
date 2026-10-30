@@ -21,7 +21,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// Handle 401 â€” remove token and redirect to login
+// Handle 401 — remove token and redirect to login
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -34,19 +34,33 @@ api.interceptors.response.use(
 );
 
 const apiService = {
-  // â”€â”€ Health â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Health ──────────────────────────────────────────────────────────────────
   healthCheck: async () => {
     const r = await api.get('/health');
     return r.data;
   },
 
-  // â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Auth ────────────────────────────────────────────────────────────────────
+  /**
+   * POST /auth/token
+   * Returns { access_token, token_type, expires_in_seconds, user_id }
+   */
+  login: async (username, password) => {
+    const r = await api.post('/auth/token', { username, password });
+    if (r.data.access_token) {
+      localStorage.setItem('token', r.data.access_token);
+      localStorage.setItem('mindcare_user_id', r.data.user_id);
+    }
+    return r.data;
+  },
+
+  // ── Config ──────────────────────────────────────────────────────────────────
   getHelpline: async () => {
     const r = await api.get('/api/config/helpline');
     return r.data;
   },
 
-  // â”€â”€ User management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── User management ─────────────────────────────────────────────────────────
   registerUser: async (userData) => {
     const r = await api.post('/api/users/register', userData);
     return r.data;
@@ -60,7 +74,7 @@ const apiService = {
     return r.data;
   },
 
-  // â”€â”€ Journal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Journal ─────────────────────────────────────────────────────────────────
   createJournalEntry: async (entryData) => {
     const r = await api.post('/api/journal/entry', entryData);
     return r.data;
@@ -70,25 +84,42 @@ const apiService = {
     return r.data;
   },
 
-  // â”€â”€ Chatbot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Chatbot ─────────────────────────────────────────────────────────────────
   sendChatMessage: async (message, userId) => {
-    // Send as JSON body â€” query params break on special characters like ? & #
     const r = await api.post('/api/chat', { message, user_id: userId });
     return r.data;
   },
 
-  // â”€â”€ Assessment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Assessment ──────────────────────────────────────────────────────────────
   /**
-   * POST /api/assess/multimodal
-   * text required; audioFile optional File object (WAV / MP3 / WebM).
+   * POST /api/assess/multimodal — EATD three-question endpoint.
+   *
+   * @param {Object} texts  — { positive: string, neutral: string, negative: string }
+   * @param {Array}  blobs  — [positiveFile|null, neutralFile|null, negativeFile|null]
+   *                          Each item is a File object (WebM/WAV/MP3) or null.
    */
-  assess: async (text, audioFile = null) => {
+  assessEATD: async (texts, blobs = [null, null, null]) => {
     const formData = new FormData();
-    formData.append('text', text);
-    formData.append('user_id', localStorage.getItem('mindcare_user_id') || 'user123');
-    if (audioFile) formData.append('audio_file', audioFile);
+    formData.append('positive_text', texts.positive || '');
+    formData.append('neutral_text',  texts.neutral  || '');
+    formData.append('negative_text', texts.negative || '');
+
+    const audioKeys = ['positive_audio', 'neutral_audio', 'negative_audio'];
+    blobs.forEach((b, i) => { if (b) formData.append(audioKeys[i], b); });
+
     const r = await api.post('/api/assess/multimodal', formData, {
       headers: { 'Content-Type': undefined }, // let browser set multipart boundary
+    });
+    return r.data;
+  },
+
+  /** Legacy single-text shortcut (kept for backward compat). */
+  assess: async (text, audioFile = null) => {
+    const formData = new FormData();
+    formData.append('positive_text', text);
+    if (audioFile) formData.append('positive_audio', audioFile);
+    const r = await api.post('/api/assess/multimodal', formData, {
+      headers: { 'Content-Type': undefined },
     });
     return r.data;
   },
@@ -106,7 +137,7 @@ const apiService = {
     return r.data;
   },
 
-  // â”€â”€ PHQ-8 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── PHQ-8 ───────────────────────────────────────────────────────────────────
   scorePHQ8: async (answers, userId = 'user123') => {
     const r = await api.post('/api/phq8/score', { answers, user_id: userId });
     return r.data;
@@ -116,7 +147,7 @@ const apiService = {
     return r.data;
   },
 
-  // â”€â”€ Model metrics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Model metrics ───────────────────────────────────────────────────────────
   getModelMetrics: async () => {
     const r = await api.get('/api/model/metrics');
     return r.data;
