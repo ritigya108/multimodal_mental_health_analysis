@@ -62,7 +62,7 @@ Thumbs.db
 *.temp
 .cache/
 
-# AI Models (large files)
+# ML model weights (large files — do NOT commit)
 *.pt
 *.pth
 *.bin
@@ -76,9 +76,19 @@ Thumbs.db
 *.sqlite3
 mental_health.db
 
+# Dataset audio / video / raw data (do NOT commit)
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+backend/data/
+data/
+
 # Streamlit — only ignore secrets, not config (config.toml needed for Streamlit Cloud)
 .streamlit/secrets.toml
-
-# Made with Bob
-
-multimodal_mental_health_analysis/
